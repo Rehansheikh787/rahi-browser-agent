@@ -4,7 +4,7 @@
  * and inter-context message passing.
  */
 
-import { callGemini, streamGemini } from './ai_gateway.js';
+import { callGemini, streamGemini, callAIWithFailover, streamAIWithFailover } from './ai_gateway.js';
 import { setupContextMenus, handleContextMenuClick } from './context_menus.js';
 
 // Initialize extension defaults on installation
@@ -167,8 +167,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const model = message.model || settings.defaultModel || 'gemini-3.5-flash-lite';
         const language = message.language || settings.preferredLanguage || 'en';
 
-        const result = await callGemini({
-          apiKey,
+        const result = await callAIWithFailover({
+          geminiApiKey: apiKey,
+          groqApiKey: settings.groqApiKey || null,
           model,
           prompt: message.prompt,
           systemInstruction: message.systemInstruction || '',
@@ -273,8 +274,9 @@ chrome.runtime.onConnect.addListener((port) => {
         const model = msg.model || settings.defaultModel || 'gemini-3.5-flash-lite';
         const language = msg.language || settings.preferredLanguage || 'en';
 
-        const result = await streamGemini({
-          apiKey,
+        const result = await streamAIWithFailover({
+          geminiApiKey: apiKey,
+          groqApiKey: settings.groqApiKey || null,
           model,
           prompt: msg.prompt,
           contents: msg.contents || null,
@@ -293,6 +295,16 @@ chrome.runtime.onConnect.addListener((port) => {
             } catch (_) {
               // Port may have closed during postMessage
             }
+          },
+          onProviderSwitched: (newProvider) => {
+            try {
+              port.postMessage({
+                type: 'PROVIDER_SWITCHED',
+                streamId,
+                provider: newProvider,
+                note: 'Switched to Groq Fallback (Gemini busy)',
+              });
+            } catch (_) {}
           },
         });
 

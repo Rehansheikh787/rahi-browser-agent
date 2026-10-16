@@ -16,6 +16,20 @@ const MODEL_ALIASES = {
   'gemini-1.5-flash': 'gemini-3.5-flash-lite',
 };
 
+export const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+export const GROQ_DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+
+/**
+ * Calculates exponential backoff delay with jitter (EC-5.1)
+ * @param {number} attempt - Current retry attempt index (0, 1, ...)
+ * @returns {number} Delay in milliseconds
+ */
+export function calculateBackoffDelay(attempt) {
+  const base = 1000 * Math.pow(2, attempt);
+  const jitter = Math.random() * 500;
+  return Math.min(base + jitter, 10000);
+}
+
 /**
  * Decorates system instruction with language rules (English vs Hinglish)
  * @param {string} baseInstruction - The core system instruction
@@ -101,16 +115,27 @@ export async function callGemini({
   const url = `${GEMINI_API_BASE}/${cleanModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch (netErr) {
-    throw new Error(`Network failure connecting to Gemini API: ${netErr.message}`);
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (netErr) {
+      throw new Error(`Network failure connecting to Gemini API: ${netErr.message}`);
+    }
+
+    if (response.status === 429 && attempt < maxRetries) {
+      const delay = calculateBackoffDelay(attempt);
+      console.warn(`[Rahi Gateway] Gemini HTTP 429 rate limit. Retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})...`);
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
+    }
+    break;
   }
 
   // Handle HTTP error statuses
@@ -265,20 +290,31 @@ export async function streamGemini({
   const url = `${GEMINI_API_BASE}/${cleanModel}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
 
   let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      signal,
-    });
-  } catch (netErr) {
-    if (signal && signal.aborted) {
-      throw new Error('Request was aborted by user or port disconnection.');
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal,
+      });
+    } catch (netErr) {
+      if (signal && signal.aborted) {
+        throw new Error('Request was aborted by user or port disconnection.');
+      }
+      throw new Error(`Network failure connecting to Gemini Streaming API: ${netErr.message}`);
     }
-    throw new Error(`Network failure connecting to Gemini Streaming API: ${netErr.message}`);
+
+    if (response.status === 429 && attempt < maxRetries) {
+      const delay = calculateBackoffDelay(attempt);
+      console.warn(`[Rahi Gateway] Gemini streaming HTTP 429. Backing off ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})...`);
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
+    }
+    break;
   }
 
   if (!response.ok) {
@@ -345,4 +381,335 @@ export async function streamGemini({
     model: cleanModel,
   };
 }
+
+/**
+ * Execute Groq text generation (OpenAI-compatible REST client)
+ * @param {Object} options
+ * @param {string} options.apiKey
+ * @param {string} [options.model='llama-3.3-70b-versatile']
+ * @param {string} [options.prompt]
+ * @param {Array} [options.contents]
+ * @param {string} [options.systemInstruction]
+ * @param {string} [options.language='en']
+ * @param {number} [options.temperature=0.2]
+ * @param {number} [options.maxTokens=2048]
+ * @returns {Promise<{ text: string, model: string, provider: 'groq', usage: Object }>}
+ */
+export async function callGroq({
+  apiKey,
+  model = GROQ_DEFAULT_MODEL,
+  prompt,
+  contents = null,
+  systemInstruction = '',
+  language = 'en',
+  temperature = 0.2,
+  maxTokens = 2048,
+}) {
+  if (!apiKey) {
+    throw new Error('Groq API key is not configured.');
+  }
+
+  const messages = [];
+
+  const conditionedInstruction = applyLanguageConditioning(systemInstruction, language);
+  if (conditionedInstruction) {
+    messages.push({ role: 'system', content: conditionedInstruction });
+  }
+
+  if (contents && Array.isArray(contents) && contents.length > 0) {
+    for (const item of contents) {
+      const role = item.role === 'model' ? 'assistant' : item.role;
+      const textPart = item.parts && item.parts.find((p) => p.text);
+      if (textPart && textPart.text) {
+        messages.push({ role, content: textPart.text });
+      }
+    }
+  } else if (prompt) {
+    messages.push({ role: 'user', content: prompt });
+  }
+
+  const payload = {
+    model,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+  };
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errDetail = `HTTP ${response.status}`;
+    try {
+      const errJson = await response.json();
+      if (errJson.error && errJson.error.message) {
+        errDetail = errJson.error.message;
+      }
+    } catch (_) {}
+    throw new Error(`Groq API Error (${response.status}): ${errDetail}`);
+  }
+
+  const json = await response.json();
+  const outputText = json.choices?.[0]?.message?.content || '';
+
+  return {
+    text: outputText.trim(),
+    model,
+    provider: 'groq',
+    usage: json.usage || null,
+  };
+}
+
+/**
+ * Parses Server-Sent Events (SSE) buffer chunks from Groq API
+ * @param {string} buffer
+ * @returns {{ deltas: string[], remaining: string }}
+ */
+export function parseGroqSSEBuffer(buffer) {
+  const deltas = [];
+  const lines = buffer.split(/\r?\n/);
+  const remaining = lines.pop() ?? '';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('data:')) continue;
+    const dataPayload = trimmed.slice(5).trim();
+    if (dataPayload === '[DONE]') continue;
+
+    try {
+      const parsed = JSON.parse(dataPayload);
+      const deltaText = parsed.choices?.[0]?.delta?.content;
+      if (deltaText) {
+        deltas.push(deltaText);
+      }
+    } catch (_) {}
+  }
+
+  return { deltas, remaining };
+}
+
+/**
+ * Stream Groq text generation via Server-Sent Events (SSE)
+ */
+export async function streamGroq({
+  apiKey,
+  model = GROQ_DEFAULT_MODEL,
+  prompt,
+  contents = null,
+  systemInstruction = '',
+  language = 'en',
+  temperature = 0.2,
+  maxTokens = 2048,
+  signal = null,
+  onChunk = () => {},
+}) {
+  if (!apiKey) {
+    throw new Error('Groq API key is not configured.');
+  }
+
+  const messages = [];
+  const conditionedInstruction = applyLanguageConditioning(systemInstruction, language);
+  if (conditionedInstruction) {
+    messages.push({ role: 'system', content: conditionedInstruction });
+  }
+
+  if (contents && Array.isArray(contents) && contents.length > 0) {
+    for (const item of contents) {
+      const role = item.role === 'model' ? 'assistant' : item.role;
+      const textPart = item.parts && item.parts.find((p) => p.text);
+      if (textPart && textPart.text) {
+        messages.push({ role, content: textPart.text });
+      }
+    }
+  } else if (prompt) {
+    messages.push({ role: 'user', content: prompt });
+  }
+
+  const payload = {
+    model,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+    stream: true,
+  };
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!response.ok) {
+    let errDetail = `HTTP ${response.status}`;
+    try {
+      const errJson = await response.json();
+      if (errJson.error && errJson.error.message) {
+        errDetail = errJson.error.message;
+      }
+    } catch (_) {}
+    throw new Error(`Groq Streaming Error (${response.status}): ${errDetail}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let sseBuffer = '';
+  let fullAccumulatedText = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunkStr = decoder.decode(value, { stream: true });
+      sseBuffer += chunkStr;
+
+      const { deltas, remaining } = parseGroqSSEBuffer(sseBuffer);
+      sseBuffer = remaining;
+
+      for (const delta of deltas) {
+        fullAccumulatedText += delta;
+        onChunk(delta);
+      }
+    }
+
+    if (sseBuffer.length > 0) {
+      const { deltas } = parseGroqSSEBuffer(sseBuffer + '\n');
+      for (const delta of deltas) {
+        fullAccumulatedText += delta;
+        onChunk(delta);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return {
+    text: fullAccumulatedText,
+    model,
+    provider: 'groq',
+  };
+}
+
+/**
+ * Unified AI Generation with automatic HTTP 429 retry and Groq failover (ADR-004)
+ */
+export async function callAIWithFailover({
+  geminiApiKey,
+  groqApiKey = null,
+  model = 'gemini-3.5-flash-lite',
+  prompt,
+  contents = null,
+  systemInstruction = '',
+  language = 'en',
+  temperature = 0.2,
+  maxTokens = 2048,
+  multimodalParts = null,
+}) {
+  try {
+    const result = await callGemini({
+      apiKey: geminiApiKey,
+      model,
+      prompt,
+      systemInstruction,
+      language,
+      temperature,
+      maxTokens,
+      multimodalParts,
+    });
+    return { ...result, provider: 'gemini', fallbackUsed: false };
+  } catch (err) {
+    const isRateLimit = err.message && (err.message.includes('429') || err.message.toLowerCase().includes('rate limit'));
+    const isTextOnly = !multimodalParts || multimodalParts.length === 0;
+
+    if (isRateLimit && isTextOnly && groqApiKey) {
+      console.warn('[Rahi Gateway] Gemini rate limit reached. Triggering failover to Groq (Llama 3.3)...');
+      const groqResult = await callGroq({
+        apiKey: groqApiKey,
+        prompt,
+        contents,
+        systemInstruction,
+        language,
+        temperature,
+        maxTokens,
+      });
+      return { ...groqResult, fallbackUsed: true, note: 'Switched to Groq Fallback (Gemini rate limited)' };
+    }
+
+    if (isRateLimit) {
+      throw new Error('Free-tier rate limit reached. Please wait 30 seconds or configure your Groq fallback key in Settings.');
+    }
+    throw err;
+  }
+}
+
+/**
+ * Unified AI Streaming with automatic HTTP 429 retry and Groq failover (ADR-004)
+ */
+export async function streamAIWithFailover({
+  geminiApiKey,
+  groqApiKey = null,
+  model = 'gemini-3.5-flash-lite',
+  prompt,
+  contents = null,
+  systemInstruction = '',
+  language = 'en',
+  temperature = 0.2,
+  maxTokens = 2048,
+  signal = null,
+  onChunk = () => {},
+  onProviderSwitched = () => {},
+}) {
+  const hasMultimodal = contents && contents.some((c) => c.parts && c.parts.some((p) => p.inlineData));
+
+  try {
+    const result = await streamGemini({
+      apiKey: geminiApiKey,
+      model,
+      prompt,
+      contents,
+      systemInstruction,
+      language,
+      temperature,
+      maxTokens,
+      signal,
+      onChunk,
+    });
+    return { ...result, provider: 'gemini', fallbackUsed: false };
+  } catch (err) {
+    const isRateLimit = err.message && (err.message.includes('429') || err.message.toLowerCase().includes('rate limit'));
+
+    if (isRateLimit && !hasMultimodal && groqApiKey) {
+      console.warn('[Rahi Gateway] Gemini streaming rate limited. Failing over to Groq...');
+      onProviderSwitched('groq');
+      const groqResult = await streamGroq({
+        apiKey: groqApiKey,
+        prompt,
+        contents,
+        systemInstruction,
+        language,
+        temperature,
+        maxTokens,
+        signal,
+        onChunk,
+      });
+      return { ...groqResult, fallbackUsed: true, note: 'Switched to Groq Fallback (Gemini rate limited)' };
+    }
+
+    if (isRateLimit) {
+      throw new Error('Free-tier rate limit reached. Please wait 30 seconds or configure your Groq fallback key in Settings.');
+    }
+    throw err;
+  }
+}
+
 

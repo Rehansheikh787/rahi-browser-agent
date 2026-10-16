@@ -184,6 +184,9 @@ export function getOrCreateStreamPort() {
 
     if (msg.type === 'CHUNK') {
       if (callbacks.onChunk) callbacks.onChunk(msg.text || '');
+    } else if (msg.type === 'PROVIDER_SWITCHED') {
+      console.log('[Rahi Stream] Provider switched:', msg.provider, msg.note);
+      if (callbacks.onProviderSwitched) callbacks.onProviderSwitched(msg.provider, msg.note);
     } else if (msg.type === 'DONE') {
       if (callbacks.onDone) callbacks.onDone(msg.fullText || '');
       streamCallbacks.delete(msg.streamId);
