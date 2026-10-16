@@ -47,19 +47,19 @@ export async function summarizeCurrentPage({ language = 'en', onStatusUpdate = n
   let extracted = null;
   try {
     extracted = await chrome.tabs.sendMessage(activeTab.id, { action: 'EXTRACT_CONTENT' });
-  } catch (msgErr) {
+  } catch (_) {
     // If content script was not already loaded (e.g. pre-existing tab), inject dynamically
-    console.warn('[Rahi Summary] Content script not responding, injecting scripts dynamically...', msgErr);
+    console.log('[Rahi Summary] Content script not pre-loaded on tab, injecting reader dynamically...');
     if (onStatusUpdate) onStatusUpdate('Injecting content reader...');
 
     try {
       await chrome.scripting.executeScript({
         target: { tabId: activeTab.id },
-        files: ['lib/readability.js', 'content/extractor.js', 'content/content.js'],
+        files: ['lib/readability.js', 'content/extractor.js', 'content/screenshot_crop.js', 'content/content.js'],
       });
 
       // Brief delay to allow scripts to initialize
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 150));
       extracted = await chrome.tabs.sendMessage(activeTab.id, { action: 'EXTRACT_CONTENT' });
     } catch (injErr) {
       throw new Error(`Failed to extract page content: ${injErr.message}. Try reloading the webpage.`);

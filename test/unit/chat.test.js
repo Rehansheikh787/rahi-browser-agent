@@ -139,4 +139,23 @@ console.log('Testing Grounded Page Chat & Streaming Logic...');
   console.log('✅ Test 5: Safe markdown formatting and XSS protection verified');
 }
 
+// Test 6: Browser Internal & Restricted URL Detection (EC-1.3)
+{
+  const { isRestrictedUrl } = await import('../../sidepanel/components/chat.js');
+
+  assert.strictEqual(isRestrictedUrl('chrome://extensions'), true);
+  assert.strictEqual(isRestrictedUrl('chrome://settings'), true);
+  assert.strictEqual(isRestrictedUrl('chrome-extension://abcdef123456/sidepanel.html'), true);
+  assert.strictEqual(isRestrictedUrl('edge://settings'), true);
+  assert.strictEqual(isRestrictedUrl('about:blank'), true);
+  assert.strictEqual(isRestrictedUrl('devtools://devtools/bundled/inspector.html'), true);
+  assert.strictEqual(isRestrictedUrl('https://chromewebstore.google.com/detail/xyz'), true);
+
+  // Normal public and local URLs must NOT be restricted
+  assert.strictEqual(isRestrictedUrl('https://en.wikipedia.org/wiki/AI'), false);
+  assert.strictEqual(isRestrictedUrl('http://localhost:3000/app'), false);
+  assert.strictEqual(isRestrictedUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), false);
+  console.log('✅ Test 6: Browser restricted URLs correctly guarded against injection');
+}
+
 console.log('All Grounded Chat and Streaming unit tests passed successfully!');

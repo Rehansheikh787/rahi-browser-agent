@@ -215,14 +215,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             action: 'SHOW_CROP_OVERLAY',
             fullScreenshotUrl,
           });
-        } catch (msgErr) {
+        } catch (_) {
           // If content script was not ready, inject dynamically
-          console.warn('[Rahi SW] Content script not responding for crop, injecting...', msgErr);
+          console.log('[Rahi SW] Content script not pre-loaded on tab for crop, injecting dynamically...');
           await chrome.scripting.executeScript({
             target: { tabId: activeTab.id },
             files: ['content/screenshot_crop.js', 'content/content.js'],
           });
-          await new Promise((r) => setTimeout(r, 200));
+          await new Promise((r) => setTimeout(r, 150));
           cropResponse = await chrome.tabs.sendMessage(activeTab.id, {
             action: 'SHOW_CROP_OVERLAY',
             fullScreenshotUrl,

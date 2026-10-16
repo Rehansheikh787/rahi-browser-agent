@@ -200,6 +200,16 @@ export function getOrCreateStreamPort() {
 }
 
 /**
+ * Checks if a tab URL is restricted by Chrome security from script injection
+ * @param {string} url
+ * @returns {boolean}
+ */
+export function isRestrictedUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  return /^(chrome|chrome-extension|edge|about|devtools):/i.test(url) || url.includes('chromewebstore.google.com');
+}
+
+/**
  * Extracts and caches content from active tab
  * @param {number} tabId
  * @returns {Promise<Object>}
@@ -217,32 +227,64 @@ export async function getOrExtractPageContext(tabId) {
     }
   }
 
+  // Check if target tab is an internal or restricted browser page
+  let tab = null;
+  try {
+    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.get) {
+      tab = await chrome.tabs.get(tabId);
+    }
+  } catch (_) {}
+
+  const url = tab?.url || '';
+  if (isRestrictedUrl(url)) {
+    const restrictedContext = {
+      title: tab?.title || 'System Page',
+      url,
+      textContent: 'Browser system/internal pages (e.g. chrome:// or extensions) are protected by browser security and cannot be scraped directly.',
+      extractedAt: Date.now(),
+      isRestricted: true,
+    };
+    pageContextCache.set(tabId, restrictedContext);
+    return restrictedContext;
+  }
+
   let extracted = null;
   try {
     extracted = await chrome.tabs.sendMessage(tabId, { action: 'EXTRACT_CONTENT' });
-  } catch (err) {
-    console.warn('[Rahi Chat] Content script not responding, injecting scripts dynamically...', err);
+  } catch (_) {
+    // Expected transient state when tab was opened before extension was loaded/reloaded.
+    // Dynamically inject content scripts cleanly without throwing console errors.
+    console.log('[Rahi Chat] Content script not pre-loaded on tab, injecting dynamically...');
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
-        files: ['lib/readability.js', 'content/extractor.js', 'content/content.js'],
+        files: ['lib/readability.js', 'content/extractor.js', 'content/screenshot_crop.js', 'content/content.js'],
       });
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 150));
       extracted = await chrome.tabs.sendMessage(tabId, { action: 'EXTRACT_CONTENT' });
     } catch (injErr) {
-      console.error('[Rahi Chat] Failed to inject content script:', injErr);
-      throw new Error(`Could not access page content: ${injErr.message}`);
+      console.log('[Rahi Chat] Script injection skipped or inaccessible:', injErr.message);
+      return {
+        title: tab?.title || 'Active Web Page',
+        url,
+        textContent: 'Could not extract page text. You can still ask questions or use "Ask about screen".',
+        extractedAt: Date.now(),
+      };
     }
   }
 
   if (!extracted || !extracted.success) {
-    const reason = extracted?.error || 'Empty content';
-    throw new Error(`Failed to extract page content (${reason}).`);
+    return {
+      title: tab?.title || extracted?.title || 'Active Web Page',
+      url: extracted?.url || url,
+      textContent: extracted?.textContent || 'No readable page text available.',
+      extractedAt: Date.now(),
+    };
   }
 
   const contextData = {
-    title: extracted.title || 'Active Web Page',
-    url: extracted.url || '',
+    title: extracted.title || tab?.title || 'Active Web Page',
+    url: extracted.url || url,
     textContent: extracted.textContent || '',
     extractedAt: Date.now(),
   };
