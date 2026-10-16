@@ -6,6 +6,7 @@
 
 import { summarizeCurrentPage, summarizeYouTubeVideo, renderSummaryCard } from './components/summary.js';
 import { ChatController } from './components/chat.js';
+import { buildContextActionPrompt } from '../background/context_menus.js';
 
 let chatController = null;
 
@@ -89,6 +90,7 @@ async function init() {
   setupProfileHandlers();
   await loadStorageData();
   await refreshActiveTabInfo();
+  await checkPendingContextAction();
 }
 
 /**
@@ -502,6 +504,47 @@ if (elements.btnRefreshContext) {
     refreshActiveTabInfo();
   });
 }
+
+/**
+ * Checks and executes any pending context menu actions from right-clicks
+ */
+async function checkPendingContextAction() {
+  try {
+    const data = await chrome.storage.local.get('pendingContextAction');
+    const pending = data.pendingContextAction;
+    if (pending && pending.selectionText) {
+      // Clear from storage immediately to prevent re-execution
+      await chrome.storage.local.remove('pendingContextAction');
+
+      // Switch to Chat tab
+      switchTab('chat');
+
+      const { prompt, systemInstruction, label } = buildContextActionPrompt(
+        pending.mode,
+        pending.selectionText,
+        state.userProfile
+      );
+
+      const displayPrompt = `**${label}:**\n> "${escapeHtml(pending.selectionText)}"`;
+
+      if (chatController) {
+        await chatController.sendUserPrompt(prompt, {
+          customSystemInstruction: systemInstruction,
+          displayPrompt,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Rahi UI] Error checking pending context action:', err);
+  }
+}
+
+// Listen for live broadcast when Side Panel is already open
+chrome.runtime.onMessage.addListener((message) => {
+  if (message && message.action === 'CONTEXT_ACTION_TRIGGERED') {
+    checkPendingContextAction();
+  }
+});
 
 /**
  * Status Indicator

@@ -454,13 +454,13 @@ export class ChatController {
     await this.sendUserPrompt(text);
   }
 
-  async sendUserPrompt(promptText) {
+  async sendUserPrompt(promptText, { customSystemInstruction = null, displayPrompt = null } = {}) {
     if (this.isStreaming) return;
 
     const state = this.getState();
     const apiKey = state.settings.geminiApiKey;
     if (!apiKey) {
-      this.appendMessageToDOM('user', promptText);
+      this.appendMessageToDOM('user', displayPrompt || promptText);
       this.appendMessageToDOM(
         'assistant',
         '⚠️ Gemini API key is missing. Please go to the **Settings** tab and enter your Google Gemini API key to enable AI responses.'
@@ -469,12 +469,13 @@ export class ChatController {
     }
 
     // 1. Render user message bubble
-    this.appendMessageToDOM('user', promptText);
+    const userBubbleText = displayPrompt || promptText;
+    this.appendMessageToDOM('user', userBubbleText);
 
     // Record user message in session
     this.session.messages.push({
       role: 'user',
-      content: promptText,
+      content: userBubbleText,
       timestamp: Date.now(),
     });
 
@@ -500,8 +501,8 @@ export class ChatController {
         };
       }
 
-      // 4. Construct grounded system instruction
-      const systemInstruction = buildGroundedChatPrompt({
+      // 4. Construct grounded system instruction or use custom instruction
+      const systemInstruction = customSystemInstruction || buildGroundedChatPrompt({
         pageTitle: pageContext.title,
         pageUrl: pageContext.url,
         pageText: pageContext.textContent,

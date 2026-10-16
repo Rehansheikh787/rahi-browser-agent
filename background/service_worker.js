@@ -5,10 +5,14 @@
  */
 
 import { callGemini, streamGemini } from './ai_gateway.js';
+import { setupContextMenus, handleContextMenuClick } from './context_menus.js';
 
 // Initialize extension defaults on installation
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log(`[Rahi SW] Extension installed/updated: reason = ${details.reason}`);
+
+  // Register context menu items
+  setupContextMenus();
 
   try {
     // Enable side panel opening on extension action toolbar click
@@ -116,6 +120,11 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     console.error('[Rahi SW] Failed to initialize storage:', err);
   }
 });
+
+// Context Menu Actions Handler (Explain, Translate, Draft Reply)
+if (chrome.contextMenus && chrome.contextMenus.onClicked) {
+  chrome.contextMenus.onClicked.addListener(handleContextMenuClick);
+}
 
 // General runtime message router
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
