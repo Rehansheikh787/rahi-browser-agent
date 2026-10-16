@@ -1,0 +1,16 @@
+# Secrets & Environment Variables
+.env
+.env*.local
+*.env
+
+# Dependency & OS files
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Chrome extension build artifacts
+*.crx
+*.pem
+*.zip
+dist/
+build/

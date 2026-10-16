@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rahi - AI Web Browser Agent</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header: Logo, Status & Active Page Info -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-badge">
+          <span class="brand-icon">🧭</span>
+          <span class="brand-name">Rahi</span>
+          <span class="brand-version">v1.0</span>
+        </div>
+        <div class="header-status" id="headerStatus">
+          <span class="status-dot online" id="statusDot"></span>
+          <span class="status-label" id="statusLabel">Ready</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="chat" title="Page Chat & Q&A">
+          <span class="tab-icon">💬</span>
+          <span class="tab-label">Chat</span>
+        </button>
+        <button class="nav-tab" data-tab="summary" title="Article & YouTube Summarizer">
+          <span class="tab-icon">📝</span>
+          <span class="tab-label">Summary</span>
+        </button>
+        <button class="nav-tab" data-tab="agent" title="Browser Action Agent">
+          <span class="tab-icon">⚡</span>
+          <span class="tab-label">Agent</span>
+        </button>
+        <button class="nav-tab" data-tab="skills" title="One-Click Skills Hub">
+          <span class="tab-icon">🧩</span>
+          <span class="tab-label">Skills</span>
+        </button>
+        <button class="nav-tab" data-tab="profile" title="Local Profile Memory">
+          <span class="tab-icon">👤</span>
+          <span class="tab-label">Profile</span>
+        </button>
+        <button class="nav-tab" data-tab="settings" title="API Keys & Preferences">
+          <span class="tab-icon">⚙️</span>
+          <span class="tab-label">Settings</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main Content Views -->
+    <main class="app-main">
+      <!-- 1. Chat View -->
+      <section class="tab-view active" id="view-chat">
+        <div class="view-header">
+          <div class="page-meta">
+            <span class="page-meta-icon">🌐</span>
+            <span class="page-title" id="chatPageTitle">Active Page Loading...</span>
+          </div>
+          <button class="btn-ghost-sm" id="btnRefreshContext" title="Refresh Page Context">🔄</button>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+          <div class="message assistant">
+            <div class="message-content">
+              <p>Namaste! I am <strong>Rahi</strong>, your AI browser agent.</p>
+              <p>I can answer questions grounded strictly in this page, summarize articles, or help you navigate. Select an option below to start:</p>
+              <div class="quick-prompts">
+                <button class="quick-pill" data-prompt="Summarize the core takeaways of this page">📌 Summarize page</button>
+                <button class="quick-pill" data-prompt="What are the main actionable points mentioned here?">🎯 Action points</button>
+                <button class="quick-pill" id="btnAskScreen">📷 Ask about screen</button>
+              </div>
+            </div>
+            <span class="message-time">Just now</span>
+          </div>
+        </div>
+
+        <div class="chat-input-bar">
+          <textarea class="chat-textarea" id="chatInput" placeholder="Ask anything about this page..." rows="1"></textarea>
+          <button class="btn-send" id="btnSendMessage" title="Send (Enter)">
+            <span>➤</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Summary View -->
+      <section class="tab-view" id="view-summary">
+        <div class="summary-controls">
+          <button class="btn-primary" id="btnSummarizePage">
+            <span>⚡ Summarise Current Page</span>
+          </button>
+          <div class="url-input-group">
+            <input type="text" id="youtubeUrlInput" placeholder="Or paste YouTube URL (e.g. youtube.com/watch?v=...)">
+            <button class="btn-secondary" id="btnSummarizeYoutube">Summarise Video</button>
+          </div>
+        </div>
+
+        <div class="summary-container" id="summaryContainer">
+          <div class="empty-state">
+            <span class="empty-icon">📄</span>
+            <p>No summary generated yet. Click <strong>Summarise Current Page</strong> or enter a YouTube link above.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Agent View -->
+      <section class="tab-view" id="view-agent">
+        <div class="agent-setup-card">
+          <label class="input-label" for="agentGoalInput">Task Goal</label>
+          <div class="agent-input-row">
+            <input type="text" id="agentGoalInput" placeholder="e.g., Fill the internship form or find the resume button">
+            <button class="btn-primary" id="btnStartAgent">Start Task</button>
+          </div>
+          <div class="agent-helpers">
+            <button class="btn-ghost-sm" id="btnFindElement">🔍 Find It for Me</button>
+            <button class="btn-ghost-sm" id="btnScanElements">🔢 Scan & Number Elements</button>
+            <button class="btn-ghost-sm" id="btnClearBadges">❌ Clear Badges</button>
+          </div>
+        </div>
+
+        <div class="agent-status-panel" id="agentStatusPanel">
+          <div class="status-empty">
+            <span>🛡️</span>
+            <p>Agent is Idle. Every action requires your explicit approval before execution.</p>
+          </div>
+        </div>
+
+        <div class="action-approval-card hidden" id="actionApprovalCard">
+          <div class="card-header">
+            <span class="step-badge" id="approvalStepNumber">Step 1 of 15</span>
+            <span class="consequential-tag hidden" id="approvalConsequentialBadge">⚠️ Consequential Action</span>
+          </div>
+          <div class="card-body">
+            <div class="target-element" id="approvalTargetPreview">Target: [#1] Button "Submit"</div>
+            <div class="action-reason" id="approvalReason">Clicking submit button to proceed.</div>
+          </div>
+          <div class="card-controls">
+            <button class="btn-action-approve" id="btnApproveAction">✅ Approve</button>
+            <button class="btn-action-dryrun" id="btnDryRunAction">👁️ Dry Run</button>
+            <button class="btn-action-skip" id="btnSkipAction">⏭️ Skip</button>
+            <button class="btn-action-stop" id="btnStopAction">🛑 Stop</button>
+          </div>
+        </div>
+
+        <div class="agent-log-section">
+          <div class="log-header">
+            <span>Execution Log</span>
+            <button class="btn-ghost-xs" id="btnClearLog">Clear</button>
+          </div>
+          <div class="agent-log-list" id="agentLogList">
+            <div class="log-item empty">No actions executed yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Skills View -->
+      <section class="tab-view" id="view-skills">
+        <div class="view-header">
+          <span class="section-title">One-Click Skills</span>
+          <div class="skills-actions">
+            <button class="btn-ghost-sm" id="btnExportSkills" title="Export Skills JSON">⬇️ Export</button>
+            <button class="btn-ghost-sm" id="btnImportSkills" title="Import Skills JSON">⬆️ Import</button>
+            <input type="file" id="skillsFileInput" accept=".json" class="hidden">
+          </div>
+        </div>
+        <div class="skills-grid" id="skillsList">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- 5. Profile View -->
+      <section class="tab-view" id="view-profile">
+        <div class="view-header">
+          <span class="section-title">Local User Profile Memory</span>
+          <span class="security-chip">🔒 Stored locally</span>
+        </div>
+        <p class="profile-hint">Rahi uses these values to assist you with form-filling and personalized drafts. Data never leaves your device except in direct model prompts.</p>
+        
+        <form class="profile-form" id="profileForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="profFullName">Full Name</label>
+              <input type="text" id="profFullName" placeholder="Rehan Sheikh">
+            </div>
+            <div class="form-group">
+              <label for="profEmail">Email</label>
+              <input type="email" id="profEmail" placeholder="rehan@example.com">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="profPhone">Phone</label>
+              <input type="tel" id="profPhone" placeholder="+91 9876543210">
+            </div>
+            <div class="form-group">
+              <label for="profCollege">College / Institute</label>
+              <input type="text" id="profCollege" placeholder="University / Institute">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="profDegree">Degree / Major</label>
+              <input type="text" id="profDegree" placeholder="B.Tech Computer Science">
+            </div>
+            <div class="form-group">
+              <label for="profTone">Preferred Tone</label>
+              <select id="profTone">
+                <option value="formal">Formal & Professional</option>
+                <option value="concise">Concise & Direct</option>
+                <option value="casual">Casual & Conversational</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="profSkills">Skills (comma-separated)</label>
+            <input type="text" id="profSkills" placeholder="JavaScript, React, Python, Chrome Extensions">
+          </div>
+          <div class="form-group">
+            <label for="profGithub">GitHub Profile</label>
+            <input type="url" id="profGithub" placeholder="https://github.com/username">
+          </div>
+          <div class="form-group">
+            <label for="profLinkedin">LinkedIn Profile</label>
+            <input type="url" id="profLinkedin" placeholder="https://linkedin.com/in/username">
+          </div>
+          <button type="button" class="btn-primary" id="btnSaveProfile">Save Profile</button>
+        </form>
+      </section>
+
+      <!-- 6. Settings View -->
+      <section class="tab-view" id="view-settings">
+        <div class="view-header">
+          <span class="section-title">API Keys & Model Configuration</span>
+        </div>
+
+        <div class="settings-form">
+          <div class="form-group">
+            <div class="label-with-link">
+              <label for="settingGeminiKey">Google Gemini API Key <span class="required">*</span></label>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" class="helper-link">Get Free Key ↗</a>
+            </div>
+            <div class="input-with-action">
+              <input type="password" id="settingGeminiKey" placeholder="AIzaSy...">
+              <button type="button" class="btn-ghost-sm" id="btnToggleGeminiKey" title="Show/Hide">👁️</button>
+            </div>
+            <span class="field-hint">Required for all everyday reasoning, article summaries & vision.</span>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-link">
+              <label for="settingGroqKey">Groq API Key (Optional Fallback)</label>
+              <a href="https://console.groq.com/keys" target="_blank" class="helper-link">Get Free Key ↗</a>
+            </div>
+            <div class="input-with-action">
+              <input type="password" id="settingGroqKey" placeholder="gsk_...">
+              <button type="button" class="btn-ghost-sm" id="btnToggleGroqKey" title="Show/Hide">👁️</button>
+            </div>
+            <span class="field-hint">Used as transparent fallback when Gemini free-tier hits HTTP 429.</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="settingDefaultModel">Default Model</label>
+              <select id="settingDefaultModel">
+                <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Fast & High Quota)</option>
+                <option value="gemini-3.8-flash">Gemini 3.8 Flash (Stronger Reasoning & Vision)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="settingStepLimit">Max Steps per Task</label>
+              <input type="number" id="settingStepLimit" min="3" max="30" value="15">
+            </div>
+          </div>
+
+          <div class="form-group-checkbox">
+            <label class="checkbox-container">
+              <input type="checkbox" id="settingDryRunDefault">
+              <span class="checkbox-label">Enable "Dry Run" by default for agent actions</span>
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button type="button" class="btn-primary" id="btnSaveSettings">Save Settings</button>
+            <button type="button" class="btn-secondary" id="btnTestApiKey">Test Connection</button>
+          </div>
+          <div class="status-feedback" id="settingsFeedback"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Footer: Language Switcher & Active Indicator -->
+    <footer class="app-footer">
+      <div class="lang-toggle-group" title="Switch AI response language">
+        <span class="lang-label">Language:</span>
+        <div class="toggle-pill" id="langToggle">
+          <button class="pill-btn active" data-lang="en">EN</button>
+          <button class="pill-btn" data-lang="hinglish">HI-EN</button>
+        </div>
+      </div>
+      <div class="footer-meta">
+        <span class="active-model-badge" id="footerModelBadge">Gemini Flash-Lite</span>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>
