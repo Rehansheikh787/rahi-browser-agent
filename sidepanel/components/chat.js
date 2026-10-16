@@ -249,27 +249,56 @@ export async function getOrExtractPageContext(tabId) {
   }
 
   let extracted = null;
+
+  // Primary method: Direct in-tab invocation via chrome.scripting.executeScript.
+  // This bypasses extension messaging ports completely, eliminating any "Receiving end does not exist" errors.
   try {
-    extracted = await chrome.tabs.sendMessage(tabId, { action: 'EXTRACT_CONTENT' });
-  } catch (_) {
-    // Expected transient state when tab was opened before extension was loaded/reloaded.
-    // Dynamically inject content scripts cleanly without throwing console errors.
-    console.log('[Rahi Chat] Content script not pre-loaded on tab, injecting dynamically...');
-    try {
-      await chrome.scripting.executeScript({
+    if (typeof chrome !== 'undefined' && chrome.scripting && chrome.scripting.executeScript) {
+      const execResults = await chrome.scripting.executeScript({
         target: { tabId },
-        files: ['lib/readability.js', 'content/extractor.js', 'content/screenshot_crop.js', 'content/content.js'],
+        func: () => {
+          if (typeof window.rahiExtractPageContent === 'function') {
+            return window.rahiExtractPageContent();
+          }
+          return null;
+        },
       });
-      await new Promise((r) => setTimeout(r, 150));
+
+      if (execResults && execResults[0] && execResults[0].result) {
+        extracted = execResults[0].result;
+      } else {
+        // Content script not loaded yet (e.g. tab opened before extension installed/reloaded)
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['lib/readability.js', 'content/extractor.js', 'content/screenshot_crop.js', 'content/content.js'],
+        });
+
+        const retryResults = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => {
+            if (typeof window.rahiExtractPageContent === 'function') {
+              return window.rahiExtractPageContent();
+            }
+            return null;
+          },
+        });
+
+        if (retryResults && retryResults[0] && retryResults[0].result) {
+          extracted = retryResults[0].result;
+        }
+      }
+    }
+  } catch (scriptErr) {
+    // Non-fatal if scripting is not permitted on this specific tab
+    console.log('[Rahi Chat] Script extraction note:', scriptErr.message);
+  }
+
+  // Graceful fallback if scripting produced no result
+  if (!extracted) {
+    try {
       extracted = await chrome.tabs.sendMessage(tabId, { action: 'EXTRACT_CONTENT' });
-    } catch (injErr) {
-      console.log('[Rahi Chat] Script injection skipped or inaccessible:', injErr.message);
-      return {
-        title: tab?.title || 'Active Web Page',
-        url,
-        textContent: 'Could not extract page text. You can still ask questions or use "Ask about screen".',
-        extractedAt: Date.now(),
-      };
+    } catch (_) {
+      // Ignored - fallback context below
     }
   }
 

@@ -43,27 +43,53 @@ export async function summarizeCurrentPage({ language = 'en', onStatusUpdate = n
 
   if (onStatusUpdate) onStatusUpdate('Extracting readable article content...');
 
-  // 2. Request extracted content from content script
+  // 2. Request extracted content from page directly via executeScript
   let extracted = null;
   try {
-    extracted = await chrome.tabs.sendMessage(activeTab.id, { action: 'EXTRACT_CONTENT' });
-  } catch (_) {
-    // If content script was not already loaded (e.g. pre-existing tab), inject dynamically
-    console.log('[Rahi Summary] Content script not pre-loaded on tab, injecting reader dynamically...');
-    if (onStatusUpdate) onStatusUpdate('Injecting content reader...');
-
-    try {
-      await chrome.scripting.executeScript({
+    if (typeof chrome !== 'undefined' && chrome.scripting && chrome.scripting.executeScript) {
+      const execResults = await chrome.scripting.executeScript({
         target: { tabId: activeTab.id },
-        files: ['lib/readability.js', 'content/extractor.js', 'content/screenshot_crop.js', 'content/content.js'],
+        func: () => {
+          if (typeof window.rahiExtractPageContent === 'function') {
+            return window.rahiExtractPageContent();
+          }
+          return null;
+        },
       });
 
-      // Brief delay to allow scripts to initialize
-      await new Promise((r) => setTimeout(r, 150));
-      extracted = await chrome.tabs.sendMessage(activeTab.id, { action: 'EXTRACT_CONTENT' });
-    } catch (injErr) {
-      throw new Error(`Failed to extract page content: ${injErr.message}. Try reloading the webpage.`);
+      if (execResults && execResults[0] && execResults[0].result) {
+        extracted = execResults[0].result;
+      } else {
+        if (onStatusUpdate) onStatusUpdate('Injecting content reader...');
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ['lib/readability.js', 'content/extractor.js', 'content/screenshot_crop.js', 'content/content.js'],
+        });
+
+        const retryResults = await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          func: () => {
+            if (typeof window.rahiExtractPageContent === 'function') {
+              return window.rahiExtractPageContent();
+            }
+            return null;
+          },
+        });
+
+        if (retryResults && retryResults[0] && retryResults[0].result) {
+          extracted = retryResults[0].result;
+        }
+      }
     }
+  } catch (injErr) {
+    console.log('[Rahi Summary] Script extraction note:', injErr.message);
+  }
+
+  // Fallback to tabs.sendMessage if executeScript was not available
+  if (!extracted) {
+    try {
+      extracted = await chrome.tabs.sendMessage(activeTab.id, { action: 'EXTRACT_CONTENT' });
+    } catch (_) {}
   }
 
   if (!extracted || !extracted.success) {
