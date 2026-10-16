@@ -5,6 +5,9 @@
  */
 
 import { summarizeCurrentPage, summarizeYouTubeVideo, renderSummaryCard } from './components/summary.js';
+import { ChatController } from './components/chat.js';
+
+let chatController = null;
 
 // Global State Cache
 const state = {
@@ -133,150 +136,34 @@ function setupLanguageToggle() {
  * Chat Interaction Handlers
  */
 function setupChatHandlers() {
-  if (!elements.btnSendMessage || !elements.chatInput) return;
-
-  // Click Send Button
-  elements.btnSendMessage.addEventListener('click', () => {
-    const text = elements.chatInput.value.trim();
-    if (text) {
-      sendChatMessage(text);
-      elements.chatInput.value = '';
-    }
-  });
-
-  // Enter Key to Send (Shift+Enter for new line)
-  elements.chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const text = elements.chatInput.value.trim();
-      if (text) {
-        sendChatMessage(text);
-        elements.chatInput.value = '';
+  chatController = new ChatController({
+    messagesContainer: elements.chatMessages,
+    inputElement: elements.chatInput,
+    sendButton: elements.btnSendMessage,
+    refreshButton: elements.btnRefreshContext,
+    quickPills: elements.quickPills,
+    getState: () => state,
+    onStatusNotification: (msg) => {
+      console.log('[Rahi UI]', msg);
+      if (elements.statusLabel) {
+        elements.statusLabel.textContent = msg;
+        setTimeout(() => {
+          updateStatusIndicator();
+        }, 3000);
       }
-    }
+    },
   });
 
-  // Quick Prompt Pills
+  // Handle quick pill for switching to summary tab
   elements.quickPills.forEach((pill) => {
     pill.addEventListener('click', () => {
       const prompt = pill.dataset.prompt;
       if (prompt && prompt.toLowerCase().includes('summarize')) {
         switchTab('summary');
         if (elements.btnSummarizePage) elements.btnSummarizePage.click();
-      } else if (prompt) {
-        sendChatMessage(prompt);
       }
     });
   });
-}
-
-/**
- * Append chat message bubble to UI
- * @param {'user' | 'assistant'} role
- * @param {string} content
- * @param {boolean} [isLoading=false]
- * @returns {HTMLElement} The created message element
- */
-function appendChatMessage(role, content, isLoading = false) {
-  if (!elements.chatMessages) return null;
-
-  const msgDiv = document.createElement('div');
-  msgDiv.className = `message ${role}`;
-
-  const contentDiv = document.createElement('div');
-  contentDiv.className = 'message-content';
-
-  if (isLoading) {
-    contentDiv.innerHTML = '<p class="typing-indicator"><em>Thinking...</em></p>';
-  } else {
-    // Basic formatting: split lines into paragraphs
-    const formattedHtml = content
-      .split('\n\n')
-      .map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
-      .join('');
-    contentDiv.innerHTML = formattedHtml || `<p>${escapeHtml(content)}</p>`;
-  }
-
-  const timeSpan = document.createElement('span');
-  timeSpan.className = 'message-time';
-  timeSpan.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  msgDiv.appendChild(contentDiv);
-  msgDiv.appendChild(timeSpan);
-  elements.chatMessages.appendChild(msgDiv);
-
-  // Auto-scroll to bottom
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-  return msgDiv;
-}
-
-/**
- * Send user query to AI Gateway via Service Worker
- * @param {string} promptText
- */
-async function sendChatMessage(promptText) {
-  // Check if API key is configured
-  if (!state.settings.geminiApiKey) {
-    appendChatMessage('user', promptText);
-    const assistantMsg = appendChatMessage(
-      'assistant',
-      '⚠️ Gemini API key is missing. Please go to the **Settings** tab and enter your Google Gemini API key to enable AI responses.'
-    );
-    // Switch to settings tab to prompt user
-    setTimeout(() => switchTab('settings'), 1200);
-    return;
-  }
-
-  // 1. Render User Message Bubble
-  appendChatMessage('user', promptText);
-
-  // 2. Render Temporary Thinking Bubble
-  const loadingBubble = appendChatMessage('assistant', '', true);
-
-  // 3. Dispatch to Service Worker
-  try {
-    const pageTitle = state.activeTab?.title || 'Active Web Page';
-    const pageUrl = state.activeTab?.url || '';
-
-    const systemInstruction = `You are Rahi, an intelligent browser assistant for the user.
-The user is viewing the page: "${pageTitle}" (${pageUrl}).
-Answer questions concisely, accurately, and politely according to the user's language settings.`;
-
-    const response = await chrome.runtime.sendMessage({
-      action: 'AI_GENERATE_TEXT',
-      prompt: promptText,
-      systemInstruction,
-      language: state.settings.preferredLanguage || 'en',
-      model: state.settings.defaultModel || 'gemini-3.5-flash-lite',
-    });
-
-    if (response && response.success) {
-      // Replace loading bubble content with generated text
-      const contentDiv = loadingBubble.querySelector('.message-content');
-      if (contentDiv) {
-        const formatted = response.text
-          .split('\n\n')
-          .map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
-          .join('');
-        contentDiv.innerHTML = formatted;
-      }
-    } else {
-      const errorMsg = response?.error || 'Unknown error occurred while contacting AI service.';
-      const contentDiv = loadingBubble.querySelector('.message-content');
-      if (contentDiv) {
-        contentDiv.innerHTML = `<p style="color: var(--accent-danger);">⚠️ <strong>Error:</strong> ${escapeHtml(errorMsg)}</p>`;
-      }
-    }
-  } catch (err) {
-    const contentDiv = loadingBubble.querySelector('.message-content');
-    if (contentDiv) {
-      contentDiv.innerHTML = `<p style="color: var(--accent-danger);">⚠️ <strong>Request Failed:</strong> ${escapeHtml(err.message)}</p>`;
-    }
-  } finally {
-    if (elements.chatMessages) {
-      elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-    }
-  }
 }
 
 /**
@@ -573,6 +460,10 @@ async function refreshActiveTabInfo() {
       elements.chatPageTitle.textContent = title;
       elements.chatPageTitle.title = tabs[0].url || title;
 
+      if (chatController) {
+        await chatController.setTab(tabs[0]);
+      }
+
       // Auto-prefill YouTube URL input if viewing YouTube
       if (tabs[0].url && elements.youtubeUrlInput && !elements.youtubeUrlInput.value) {
         if (/youtube\.com|youtu\.be/i.test(tabs[0].url)) {
@@ -586,6 +477,24 @@ async function refreshActiveTabInfo() {
     console.warn('[Rahi UI] Could not query active tab:', err);
     elements.chatPageTitle.textContent = 'Browser Context Active';
   }
+}
+
+// Sync active tab changes dynamically in Side Panel
+try {
+  if (chrome.tabs && chrome.tabs.onActivated) {
+    chrome.tabs.onActivated.addListener(async () => {
+      await refreshActiveTabInfo();
+    });
+  }
+  if (chrome.tabs && chrome.tabs.onUpdated) {
+    chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+      if (changeInfo.status === 'complete' && state.activeTab && state.activeTab.id === tabId) {
+        await refreshActiveTabInfo();
+      }
+    });
+  }
+} catch (tabEvtErr) {
+  console.warn('[Rahi UI] Could not register tab event listeners:', tabEvtErr);
 }
 
 if (elements.btnRefreshContext) {

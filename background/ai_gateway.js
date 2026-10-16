@@ -157,3 +157,192 @@ export async function callGemini({
     finishReason: candidate.finishReason || 'STOP',
   };
 }
+
+/**
+ * Parses raw Server-Sent Events (SSE) buffer chunks from Gemini API
+ * @param {string} buffer - Raw incoming string buffer
+ * @returns {{ deltas: string[], remaining: string }} Parsed deltas and remaining incomplete buffer
+ */
+export function parseSSEBuffer(buffer) {
+  const deltas = [];
+  const lines = buffer.split(/\r?\n/);
+  
+  // The last item in lines is either empty (if ended with \n) or an incomplete line
+  const remaining = lines.pop() ?? '';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('data:')) {
+      continue;
+    }
+
+    const dataPayload = trimmed.slice(5).trim();
+    if (dataPayload === '[DONE]') {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(dataPayload);
+      const candidate = parsed.candidates && parsed.candidates[0];
+      if (candidate && candidate.content && candidate.content.parts) {
+        for (const part of candidate.content.parts) {
+          if (part.text) {
+            deltas.push(part.text);
+          }
+        }
+      }
+    } catch (_) {
+      // Incomplete or non-JSON data chunk line, ignored
+    }
+  }
+
+  return { deltas, remaining };
+}
+
+/**
+ * Stream Gemini text generation via Server-Sent Events (SSE)
+ * @param {Object} options
+ * @param {string} options.apiKey
+ * @param {string} [options.model='gemini-3.5-flash-lite']
+ * @param {string} [options.prompt]
+ * @param {Array} [options.contents] - Multi-turn conversation contents
+ * @param {string} [options.systemInstruction]
+ * @param {string} [options.language='en']
+ * @param {number} [options.temperature=0.2]
+ * @param {number} [options.maxTokens=2048]
+ * @param {AbortSignal} [options.signal]
+ * @param {(delta: string) => void} options.onChunk - Callback invoked per token delta
+ * @returns {Promise<{ text: string, model: string }>}
+ */
+export async function streamGemini({
+  apiKey,
+  model = 'gemini-3.5-flash-lite',
+  prompt,
+  contents = null,
+  systemInstruction = '',
+  language = 'en',
+  temperature = 0.2,
+  maxTokens = 2048,
+  signal = null,
+  onChunk = () => {},
+}) {
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured. Please add your key in Rahi Settings.');
+  }
+
+  // Build target endpoint with automatic legacy alias resolution
+  let cleanModel = (model || 'gemini-3.5-flash-lite').replace(/^models\//, '');
+  if (MODEL_ALIASES[cleanModel]) {
+    cleanModel = MODEL_ALIASES[cleanModel];
+  }
+
+  // Prepare contents array
+  let requestContents = [];
+  if (contents && Array.isArray(contents) && contents.length > 0) {
+    requestContents = contents;
+  } else if (prompt) {
+    requestContents = [{ role: 'user', parts: [{ text: prompt }] }];
+  } else {
+    throw new Error('Prompt or contents is required for streaming.');
+  }
+
+  const conditionedInstruction = applyLanguageConditioning(systemInstruction, language);
+
+  const payload = {
+    contents: requestContents,
+    generationConfig: {
+      temperature,
+      maxOutputTokens: maxTokens,
+    },
+  };
+
+  if (conditionedInstruction) {
+    payload.systemInstruction = {
+      parts: [{ text: conditionedInstruction }],
+    };
+  }
+
+  const url = `${GEMINI_API_BASE}/${cleanModel}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+  } catch (netErr) {
+    if (signal && signal.aborted) {
+      throw new Error('Request was aborted by user or port disconnection.');
+    }
+    throw new Error(`Network failure connecting to Gemini Streaming API: ${netErr.message}`);
+  }
+
+  if (!response.ok) {
+    let errorDetail = `HTTP ${response.status}`;
+    try {
+      const errJson = await response.json();
+      if (errJson.error && errJson.error.message) {
+        errorDetail = errJson.error.message;
+      }
+    } catch (_) {}
+
+    if (response.status === 429) {
+      throw new Error(`Rate limit reached (HTTP 429): ${errorDetail}`);
+    } else {
+      throw new Error(`Gemini Streaming API Error (${response.status}): ${errorDetail}`);
+    }
+  }
+
+  if (!response.body) {
+    throw new Error('Gemini response body is null or streaming is unsupported.');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let sseBuffer = '';
+  let fullAccumulatedText = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunkStr = decoder.decode(value, { stream: true });
+      sseBuffer += chunkStr;
+
+      const { deltas, remaining } = parseSSEBuffer(sseBuffer);
+      sseBuffer = remaining;
+
+      for (const delta of deltas) {
+        fullAccumulatedText += delta;
+        onChunk(delta);
+      }
+    }
+
+    // Flush any trailing buffer if present
+    if (sseBuffer.length > 0) {
+      const { deltas } = parseSSEBuffer(sseBuffer + '\n');
+      for (const delta of deltas) {
+        fullAccumulatedText += delta;
+        onChunk(delta);
+      }
+    }
+  } catch (streamErr) {
+    if (signal && signal.aborted) {
+      throw new Error('Streaming aborted.');
+    }
+    throw streamErr;
+  } finally {
+    reader.releaseLock();
+  }
+
+  return {
+    text: fullAccumulatedText,
+    model: cleanModel,
+  };
+}
+

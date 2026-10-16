@@ -337,6 +337,60 @@ body {
   background-color: var(--accent-primary-hover);
 }
 
+/* Streaming cursor animation & token layout */
+.stream-cursor {
+  display: inline-block;
+  color: var(--accent-primary);
+  margin-left: 2px;
+  animation: blink 0.8s infinite;
+  font-weight: 700;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Chat Markdown Formatting */
+.message-content p {
+  margin-bottom: 6px;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.inline-code {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #38bdf8;
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.code-block {
+  background-color: #0b0f19;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin: 6px 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: #e2e8f0;
+}
+
+.chat-list {
+  margin: 4px 0 6px 18px;
+  padding: 0;
+}
+
+.chat-list li {
+  margin-bottom: 3px;
+  font-size: 12.5px;
+}
+
 /* Summary View */
 .summary-controls {
   display: flex;

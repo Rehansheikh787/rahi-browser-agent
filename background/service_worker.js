@@ -4,7 +4,7 @@
  * and inter-context message passing.
  */
 
-import { callGemini } from './ai_gateway.js';
+import { callGemini, streamGemini } from './ai_gateway.js';
 
 // Initialize extension defaults on installation
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -181,4 +181,99 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Fallthrough
   return false;
 });
+
+// ==========================================
+// Long-Lived Message Port for Streaming (ADR-005 & EC-1.2)
+// ==========================================
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'rahi-stream') return;
+
+  console.log('[Rahi SW] Long-lived stream port connected:', port.name);
+  let activeAbortController = null;
+
+  // Handle port disconnect: abort in-flight fetch immediately to prevent zombie connections (EC-1.2)
+  port.onDisconnect.addListener(() => {
+    console.log('[Rahi SW] Stream port disconnected.');
+    if (activeAbortController) {
+      console.log('[Rahi SW] Aborting in-flight streaming fetch due to port disconnect.');
+      activeAbortController.abort();
+      activeAbortController = null;
+    }
+  });
+
+  // Handle incoming stream requests from Side Panel
+  port.onMessage.addListener(async (msg) => {
+    if (msg.action === 'STREAM_CHAT') {
+      const streamId = msg.streamId || `stream_${Date.now()}`;
+      activeAbortController = new AbortController();
+
+      try {
+        const stored = await chrome.storage.local.get('settings');
+        const settings = stored.settings || {};
+        const apiKey = msg.apiKey || settings.geminiApiKey;
+        const model = msg.model || settings.defaultModel || 'gemini-3.5-flash-lite';
+        const language = msg.language || settings.preferredLanguage || 'en';
+
+        const result = await streamGemini({
+          apiKey,
+          model,
+          prompt: msg.prompt,
+          contents: msg.contents || null,
+          systemInstruction: msg.systemInstruction || '',
+          language,
+          temperature: msg.temperature ?? 0.2,
+          maxTokens: msg.maxTokens ?? 2048,
+          signal: activeAbortController.signal,
+          onChunk: (delta) => {
+            try {
+              port.postMessage({
+                type: 'CHUNK',
+                streamId,
+                text: delta,
+              });
+            } catch (_) {
+              // Port may have closed during postMessage
+            }
+          },
+        });
+
+        try {
+          port.postMessage({
+            type: 'DONE',
+            streamId,
+            fullText: result.text,
+            model: result.model,
+          });
+        } catch (_) {}
+      } catch (err) {
+        if (activeAbortController && activeAbortController.signal.aborted) {
+          console.log('[Rahi SW] Stream was cleanly aborted.');
+        } else {
+          console.error('[Rahi SW] Streaming error:', err);
+          try {
+            port.postMessage({
+              type: 'ERROR',
+              streamId,
+              error: err.message,
+            });
+          } catch (_) {}
+        }
+      } finally {
+        activeAbortController = null;
+      }
+    }
+  });
+});
+
+// Clean up tab-scoped chat session on tab close to prevent memory/storage leaks
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  try {
+    const sessionKey = `chat_session_${tabId}`;
+    await chrome.storage.local.remove(sessionKey);
+    console.log(`[Rahi SW] Cleaned up chat session for closed tab ${tabId}`);
+  } catch (err) {
+    console.warn(`[Rahi SW] Failed to cleanup session for tab ${tabId}:`, err);
+  }
+});
+
 
