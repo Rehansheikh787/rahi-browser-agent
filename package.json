@@ -4,11 +4,12 @@
   "description": "Rahi — Chrome Side-Panel AI Browser Agent (Manifest V3)",
   "type": "module",
   "scripts": {
-    "test": "node test/unit/ai_gateway.test.js && node test/unit/summary.test.js && node test/unit/chat.test.js && node test/unit/context_menus.test.js",
+    "test": "node test/unit/ai_gateway.test.js && node test/unit/summary.test.js && node test/unit/chat.test.js && node test/unit/context_menus.test.js && node test/unit/screenshot.test.js",
     "test:gateway": "node test/unit/ai_gateway.test.js",
     "test:summary": "node test/unit/summary.test.js",
     "test:chat": "node test/unit/chat.test.js",
-    "test:context": "node test/unit/context_menus.test.js"
+    "test:context": "node test/unit/context_menus.test.js",
+    "test:screenshot": "node test/unit/screenshot.test.js"
   },
   "keywords": [
     "chrome-extension",

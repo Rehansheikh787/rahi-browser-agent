@@ -39,5 +39,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  // 3. Visual Screenshot Drag-to-Crop Overlay (ADR-006 & EC-4.1 - EC-4.4)
+  if (message.action === 'SHOW_CROP_OVERLAY') {
+    if (typeof window.rahiStartCropOverlay === 'function') {
+      window.rahiStartCropOverlay(message.fullScreenshotUrl)
+        .then((cropResult) => {
+          sendResponse({ success: true, ...cropResult });
+        })
+        .catch((err) => {
+          sendResponse({ success: false, error: err.message, cancelled: err.message.includes('cancelled') });
+        });
+      return true; // Keep channel open for async response
+    } else {
+      sendResponse({ success: false, error: 'Crop overlay module not loaded.' });
+      return false;
+    }
+  }
+
   return false;
 });

@@ -335,6 +335,10 @@ export class ChatController {
     if (this.quickPills) {
       this.quickPills.forEach((pill) => {
         pill.addEventListener('click', () => {
+          if (pill.id === 'btnAskScreen') {
+            this.handleAskScreen();
+            return;
+          }
           const prompt = pill.dataset.prompt;
           if (prompt) {
             this.sendUserPrompt(prompt);
@@ -392,6 +396,10 @@ export class ChatController {
       const newPills = this.container.querySelectorAll('.quick-pill');
       newPills.forEach((pill) => {
         pill.addEventListener('click', () => {
+          if (pill.id === 'btnAskScreen') {
+            this.handleAskScreen();
+            return;
+          }
           const prompt = pill.dataset.prompt;
           if (prompt) this.sendUserPrompt(prompt);
         });
@@ -575,6 +583,158 @@ export class ChatController {
       if (contentDiv) {
         contentDiv.innerHTML = `<p style="color: var(--accent-danger);">⚠️ <strong>Request Error:</strong> ${escapeHtml(err.message)}</p>`;
       }
+    } finally {
+      this.isStreaming = false;
+      this.scrollToBottom();
+    }
+  }
+
+  /**
+   * Triggers viewport capture and interactive crop overlay (ADR-006 & EC-4.1 - EC-4.4)
+   */
+  async handleAskScreen() {
+    if (this.isStreaming) return;
+
+    const state = this.getState();
+    const apiKey = state.settings.geminiApiKey;
+    if (!apiKey) {
+      this.appendMessageToDOM(
+        'assistant',
+        '⚠️ Gemini API key is missing. Please go to the **Settings** tab and enter your Google Gemini API key to enable visual queries.'
+      );
+      return;
+    }
+
+    this.notify('Drag on the webpage to select an area to analyze...');
+
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'CAPTURE_AND_CROP_SCREEN' });
+
+      if (!response) {
+        throw new Error('No response from screenshot capture service.');
+      }
+
+      if (response.cancelled) {
+        this.notify('Screenshot cancelled.');
+        return;
+      }
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to capture screenshot');
+      }
+
+      // EC-4.3: DRM protected content warning
+      if (response.isDrmProtected) {
+        this.appendMessageToDOM(
+          'assistant',
+          '⚠️ **DRM Protected Content:** The captured screen area appears black because the active media is protected by browser DRM (e.g. Netflix, Prime Video, Disney+). Visual analysis cannot be performed.'
+        );
+        return;
+      }
+
+      // Check if user already typed a specific question in chat input
+      let question = this.input ? this.input.value.trim() : '';
+      if (this.input) this.input.value = '';
+      if (!question) {
+        question = 'Analyze this screenshot and explain the core information, charts, or errors shown.';
+      }
+
+      // Render user bubble with screenshot preview
+      const userBubble = this.appendMessageToDOM('user', question);
+      const contentDiv = userBubble.querySelector('.message-content');
+      if (contentDiv) {
+        const previewDiv = document.createElement('div');
+        previewDiv.className = 'screenshot-preview';
+        previewDiv.innerHTML = `<img src="${response.croppedDataUrl}" alt="Cropped Screenshot"><span class="screenshot-badge">${response.width}×${response.height}</span>`;
+        contentDiv.prepend(previewDiv);
+      }
+
+      this.session.messages.push({
+        role: 'user',
+        content: `[Screenshot Query]: ${question}`,
+        timestamp: Date.now(),
+      });
+
+      // Render streaming assistant bubble
+      const assistantBubble = this.appendMessageToDOM('assistant', '', { isStreaming: true });
+      const assistantContentDiv = assistantBubble.querySelector('.message-content');
+      const textSpan = assistantBubble.querySelector('.streaming-text');
+      const cursorSpan = assistantBubble.querySelector('.stream-cursor');
+
+      this.isStreaming = true;
+
+      const base64Data = response.croppedDataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+
+      const contents = [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: base64Data,
+              },
+            },
+            {
+              text: question,
+            },
+          ],
+        },
+      ];
+
+      const systemInstruction = `You are Rahi, an expert visual AI assistant.
+Examine the provided screenshot image closely. Answer the user's question with precise visual grounding.
+If reading a chart, diagram, formula, table, or error message, quote exact labels, values, and trends observed in the image.
+Keep your response clear, well-structured, and concise.`;
+
+      const port = getOrCreateStreamPort();
+      const streamId = `vision_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      let accumulatedResponse = '';
+
+      await new Promise((resolve, reject) => {
+        streamCallbacks.set(streamId, {
+          onChunk: (delta) => {
+            accumulatedResponse += delta;
+            if (textSpan) {
+              textSpan.textContent = accumulatedResponse;
+              this.scrollToBottom();
+            }
+          },
+          onDone: (fullText) => {
+            if (cursorSpan) cursorSpan.remove();
+            if (assistantContentDiv) {
+              assistantContentDiv.innerHTML = formatMarkdown(fullText || accumulatedResponse);
+            }
+            resolve(fullText || accumulatedResponse);
+          },
+          onError: (err) => {
+            if (cursorSpan) cursorSpan.remove();
+            reject(err);
+          },
+        });
+
+        port.postMessage({
+          action: 'STREAM_CHAT',
+          streamId,
+          tabId: this.activeTabId,
+          prompt: question,
+          contents,
+          systemInstruction,
+          language: state.settings.preferredLanguage || 'en',
+          model: 'gemini-3.8-flash',
+          apiKey,
+        });
+      });
+
+      this.session.messages.push({
+        role: 'assistant',
+        content: accumulatedResponse,
+        timestamp: Date.now(),
+      });
+      await saveTabChatSession(this.activeTabId, this.session);
+    } catch (err) {
+      console.error('[Rahi Chat] Visual query error:', err);
+      this.appendMessageToDOM('assistant', `⚠️ **Screenshot Error:** ${escapeHtml(err.message)}`);
     } finally {
       this.isStreaming = false;
       this.scrollToBottom();

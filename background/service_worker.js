@@ -187,6 +187,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
 
+  // Viewport Capture and Interactive Crop (Slice 2.3 & ADR-006)
+  if (message.action === 'CAPTURE_AND_CROP_SCREEN') {
+    (async () => {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const activeTab = tabs && tabs[0] ? tabs[0] : null;
+        if (!activeTab || !activeTab.id) {
+          throw new Error('No active browser tab found to capture.');
+        }
+
+        // EC-1.3 Check internal URLs
+        if (/^(chrome|edge|about|chromewebstore):/i.test(activeTab.url || '')) {
+          throw new Error('Screenshots cannot be captured on browser internal pages.');
+        }
+
+        // Capture visible tab
+        const fullScreenshotUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
+          format: 'png',
+        });
+
+        // Send to content script to display crop overlay
+        let cropResponse = null;
+        try {
+          cropResponse = await chrome.tabs.sendMessage(activeTab.id, {
+            action: 'SHOW_CROP_OVERLAY',
+            fullScreenshotUrl,
+          });
+        } catch (msgErr) {
+          // If content script was not ready, inject dynamically
+          console.warn('[Rahi SW] Content script not responding for crop, injecting...', msgErr);
+          await chrome.scripting.executeScript({
+            target: { tabId: activeTab.id },
+            files: ['content/screenshot_crop.js', 'content/content.js'],
+          });
+          await new Promise((r) => setTimeout(r, 200));
+          cropResponse = await chrome.tabs.sendMessage(activeTab.id, {
+            action: 'SHOW_CROP_OVERLAY',
+            fullScreenshotUrl,
+          });
+        }
+
+        sendResponse(cropResponse || { success: false, error: 'No response from crop overlay' });
+      } catch (err) {
+        console.error('[Rahi SW] CAPTURE_AND_CROP_SCREEN error:', err);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true; // Keep channel open for async response
+  }
+
   // Fallthrough
   return false;
 });

@@ -273,6 +273,37 @@ body {
   padding: 0 4px;
 }
 
+/* Screenshot Preview Thumbnail in Chat */
+.screenshot-preview {
+  margin: 6px 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  max-width: 260px;
+  position: relative;
+  background-color: #0b0f19;
+}
+
+.screenshot-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+  object-fit: contain;
+}
+
+.screenshot-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #94a3b8;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
 .quick-prompts {
   display: flex;
   flex-wrap: wrap;
