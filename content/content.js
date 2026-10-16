@@ -56,5 +56,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
 
+  // 4. Live YouTube DOM details extraction (when on watch page)
+  if (message.action === 'EXTRACT_YOUTUBE_DOM') {
+    try {
+      const titleEl = document.querySelector('h1.ytd-watch-metadata yt-formatted-string') ||
+                      document.querySelector('h1.title yt-formatted-string') ||
+                      document.querySelector('h1.title');
+      const title = titleEl ? titleEl.textContent.trim() : document.title.replace(/ - YouTube$/i, '');
+
+      const authorEl = document.querySelector('#channel-name a') ||
+                       document.querySelector('ytd-channel-name a');
+      const author = authorEl ? authorEl.textContent.trim() : '';
+
+      const descEl = document.querySelector('#description-inline-expander') ||
+                     document.querySelector('#description yt-formatted-string') ||
+                     document.querySelector('#description');
+      const description = descEl ? descEl.innerText.trim() : '';
+
+      sendResponse({
+        success: true,
+        title,
+        author,
+        description,
+      });
+    } catch (ytErr) {
+      sendResponse({ success: false, error: ytErr.message });
+    }
+    return false;
+  }
+
   return false;
 });

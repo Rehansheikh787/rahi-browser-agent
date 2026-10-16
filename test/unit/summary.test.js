@@ -130,4 +130,64 @@ console.log('Testing summary parser and extraction logic...');
   console.log('✅ Test 7: YouTube chapter and takeaway schema validation passed');
 }
 
+// Test 8: Parsing creator timestamps from video description
+{
+  const { parseTimestampsFromDescription } = await import('../../background/youtube_handler.js');
+
+  const sampleDesc = `
+Gemini 4 Argon is Google's newest model!
+
+TIMESTAMPS:
+00:00 Introduction & Overview
+00:38 Argon Features
+01:17 Tasks Option
+01:53 Website demo
+03:06 AI thumbnail workflow
+04:39 Argon vs paid models
+05:28 Conclusion & Free offer
+`;
+
+  const parsedChapters = parseTimestampsFromDescription(sampleDesc);
+  assert.strictEqual(parsedChapters.length, 7);
+  assert.strictEqual(parsedChapters[0].timestampSeconds, 0);
+  assert.strictEqual(parsedChapters[0].timestampLabel, '00:00');
+  assert.strictEqual(parsedChapters[0].title, 'Introduction & Overview');
+  assert.strictEqual(parsedChapters[1].timestampSeconds, 38);
+  assert.strictEqual(parsedChapters[1].timestampLabel, '00:38');
+  assert.strictEqual(parsedChapters[1].title, 'Argon Features');
+  assert.strictEqual(parsedChapters[6].timestampSeconds, 328);
+  assert.strictEqual(parsedChapters[6].timestampLabel, '05:28');
+  console.log('✅ Test 8: Creator description timestamps parsed accurately');
+}
+
+// Test 9: Grounded YouTube prompt with verified metadata
+{
+  const { buildYouTubePrompt } = await import('../../background/youtube_handler.js');
+
+  const metadata = {
+    title: 'Gemini 4 Argon FREE: Build Website, PPT & Thumbnails',
+    author: 'Ai With Shivam',
+    durationSeconds: 362,
+    keywords: ['Gemini', 'AI Website', 'Thumbnails'],
+    description: 'Learn how to use Gemini 4 Argon free with no coding required.',
+    detectedChapters: [
+      { timestampSeconds: 0, timestampLabel: '00:00', title: 'Intro' }
+    ]
+  };
+
+  const { systemInstruction, prompt, canonicalUrl } = buildYouTubePrompt({
+    videoId: 'fUt48RYR10Q',
+    language: 'en',
+    metadata,
+  });
+
+  assert.ok(prompt.includes('Gemini 4 Argon FREE: Build Website, PPT & Thumbnails'));
+  assert.ok(prompt.includes('Ai With Shivam'));
+  assert.ok(prompt.includes('362s (06:02)'));
+  assert.ok(prompt.includes('Learn how to use Gemini 4 Argon free'));
+  assert.ok(prompt.includes('[CREATOR CHAPTER TIMESTAMPS]'));
+  assert.ok(systemInstruction.includes('Ground all facts, topics, and takeaways strictly'));
+  console.log('✅ Test 9: Grounded YouTube prompt generation verified');
+}
+
 console.log('All summary and YouTube unit tests passed successfully!');

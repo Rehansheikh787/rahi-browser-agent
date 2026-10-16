@@ -9,6 +9,7 @@ import {
   buildYouTubeWatchUrl,
   formatTimestampLabel,
   buildYouTubePrompt,
+  fetchYouTubeVideoDetails,
 } from '../../background/youtube_handler.js';
 
 /**
@@ -151,9 +152,45 @@ export async function summarizeYouTubeVideo({ videoUrlOrId, language = 'en', onS
     throw new Error('Please enter a valid YouTube video URL (e.g. https://www.youtube.com/watch?v=...) or video ID.');
   }
 
-  if (onStatusUpdate) onStatusUpdate('Analyzing YouTube video with Gemini...');
+  if (onStatusUpdate) onStatusUpdate('Fetching YouTube video details and chapters...');
 
-  const { systemInstruction, prompt, canonicalUrl } = buildYouTubePrompt({ videoId, language });
+  // 1. Fetch real video metadata and description from oEmbed and watch page
+  let metadata = null;
+  try {
+    metadata = await fetchYouTubeVideoDetails(videoId);
+  } catch (metaErr) {
+    console.warn('[Rahi Summary] Could not fetch detailed YouTube metadata, falling back:', metaErr);
+  }
+
+  // 2. If active tab is currently open to this YouTube video, grab fresh DOM elements
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs && tabs[0] ? tabs[0] : null;
+    if (activeTab && activeTab.id && activeTab.url && extractYouTubeVideoId(activeTab.url) === videoId) {
+      const pageData = await chrome.tabs.sendMessage(activeTab.id, { action: 'EXTRACT_YOUTUBE_DOM' }).catch(() => null);
+      if (pageData && pageData.success) {
+        metadata = {
+          videoId,
+          title: pageData.title || metadata?.title || 'YouTube Video',
+          author: pageData.author || metadata?.author || '',
+          description: pageData.description || metadata?.description || '',
+          durationSeconds: metadata?.durationSeconds || 0,
+          keywords: metadata?.keywords || [],
+          detectedChapters: metadata?.detectedChapters || [],
+        };
+      }
+    }
+  } catch (_) {
+    // Non-fatal if active tab query or message fails
+  }
+
+  if (onStatusUpdate) onStatusUpdate('Rahi AI is generating high-yield video summary...');
+
+  const { systemInstruction, prompt, canonicalUrl } = buildYouTubePrompt({
+    videoId,
+    language,
+    metadata,
+  });
 
   let aiResponse;
   try {
@@ -178,10 +215,27 @@ export async function summarizeYouTubeVideo({ videoUrlOrId, language = 'en', onS
   }
 
   const parsed = parseYouTubeSummaryJson(aiResponse.text, videoId);
+
+  // If parsed title is generic fallback, prefer the verified metadata title
+  if ((!parsed.videoTitle || parsed.videoTitle === 'YouTube Video') && metadata?.title) {
+    parsed.videoTitle = metadata.title;
+  }
+
+  // If chapters were empty from AI output but we detected real chapters from description, use them
+  if ((!parsed.chapters || parsed.chapters.length === 0) && metadata?.detectedChapters?.length) {
+    parsed.chapters = metadata.detectedChapters.map((c) => ({
+      timestampSeconds: c.timestampSeconds,
+      timestampLabel: c.timestampLabel,
+      title: c.title,
+      summary: '',
+    }));
+  }
+
   return {
     type: 'youtube',
     videoId,
     canonicalUrl,
+    author: metadata?.author || '',
     ...parsed,
   };
 }
