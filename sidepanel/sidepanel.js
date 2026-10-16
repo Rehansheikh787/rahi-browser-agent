@@ -4,7 +4,7 @@
  * language toggle, and inter-component routing.
  */
 
-import { summarizeCurrentPage, renderSummaryCard } from './components/summary.js';
+import { summarizeCurrentPage, summarizeYouTubeVideo, renderSummaryCard } from './components/summary.js';
 
 // Global State Cache
 const state = {
@@ -70,6 +70,8 @@ const elements = {
   // Summary View Elements
   btnSummarizePage: document.getElementById('btnSummarizePage'),
   summaryContainer: document.getElementById('summaryContainer'),
+  youtubeUrlInput: document.getElementById('youtubeUrlInput'),
+  btnSummarizeYoutube: document.getElementById('btnSummarizeYoutube'),
 };
 
 /**
@@ -345,6 +347,58 @@ function setupSummaryHandlers() {
       }
     }
   });
+
+  // Dedicated YouTube URL Summarizer Button
+  if (elements.btnSummarizeYoutube && elements.youtubeUrlInput) {
+    elements.btnSummarizeYoutube.addEventListener('click', async () => {
+      const url = elements.youtubeUrlInput.value.trim();
+      if (!url) {
+        alert('Please enter or paste a valid YouTube video URL.');
+        return;
+      }
+
+      if (!state.settings.geminiApiKey) {
+        switchTab('settings');
+        return;
+      }
+
+      elements.summaryContainer.innerHTML = `
+        <div class="summary-loader">
+          <div class="spinner"></div>
+          <p id="summaryStatusText">Connecting to YouTube video notes...</p>
+        </div>
+      `;
+
+      const statusEl = elements.summaryContainer.querySelector('#summaryStatusText');
+
+      try {
+        const summaryData = await summarizeYouTubeVideo({
+          videoUrlOrId: url,
+          language: state.settings.preferredLanguage || 'en',
+          onStatusUpdate: (st) => {
+            if (statusEl) statusEl.textContent = st;
+          },
+        });
+
+        renderSummaryCard(elements.summaryContainer, summaryData);
+      } catch (err) {
+        console.error('[Rahi YouTube UI] Error:', err);
+        elements.summaryContainer.innerHTML = `
+          <div class="summary-card" style="border-color: var(--accent-danger);">
+            <div class="summary-alert warning" style="color: var(--accent-danger); background-color: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">
+              <p><strong>⚠️ YouTube Summarization Failed:</strong> ${escapeHtml(err.message)}</p>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    elements.youtubeUrlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        elements.btnSummarizeYoutube.click();
+      }
+    });
+  }
 }
 
 /**
@@ -518,6 +572,13 @@ async function refreshActiveTabInfo() {
       const title = tabs[0].title || 'Untitled Tab';
       elements.chatPageTitle.textContent = title;
       elements.chatPageTitle.title = tabs[0].url || title;
+
+      // Auto-prefill YouTube URL input if viewing YouTube
+      if (tabs[0].url && elements.youtubeUrlInput && !elements.youtubeUrlInput.value) {
+        if (/youtube\.com|youtu\.be/i.test(tabs[0].url)) {
+          elements.youtubeUrlInput.value = tabs[0].url;
+        }
+      }
     } else {
       elements.chatPageTitle.textContent = 'No Active Tab';
     }

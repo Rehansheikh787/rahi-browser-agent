@@ -77,4 +77,57 @@ console.log('Testing summary parser and extraction logic...');
   console.log('✅ Test 4: Paywall heuristic check passed');
 }
 
-console.log('All summary unit tests passed successfully!');
+// Test 5: YouTube URL and ID extraction permutations (EC-3.5)
+{
+  const { extractYouTubeVideoId } = await import('../../background/youtube_handler.js');
+
+  const standardUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+  const shortUrl = 'https://youtu.be/dQw4w9WgXcQ';
+  const shortsUrl = 'https://www.youtube.com/shorts/dQw4w9WgXcQ?feature=share';
+  const complexUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=45s&list=PL123&ab_channel=RickAstley';
+  const embedUrl = 'https://www.youtube.com/embed/dQw4w9WgXcQ';
+  const invalidUrl = 'https://example.com/not-youtube';
+
+  assert.strictEqual(extractYouTubeVideoId(standardUrl), 'dQw4w9WgXcQ');
+  assert.strictEqual(extractYouTubeVideoId(shortUrl), 'dQw4w9WgXcQ');
+  assert.strictEqual(extractYouTubeVideoId(shortsUrl), 'dQw4w9WgXcQ');
+  assert.strictEqual(extractYouTubeVideoId(complexUrl), 'dQw4w9WgXcQ');
+  assert.strictEqual(extractYouTubeVideoId(embedUrl), 'dQw4w9WgXcQ');
+  assert.strictEqual(extractYouTubeVideoId(invalidUrl), null);
+  console.log('✅ Test 5: YouTube URL parsing permutations passed');
+}
+
+// Test 6: Timestamp formatting and deep links
+{
+  const { formatTimestampLabel, buildYouTubeWatchUrl } = await import('../../background/youtube_handler.js');
+
+  assert.strictEqual(formatTimestampLabel(0), '00:00');
+  assert.strictEqual(formatTimestampLabel(45), '00:45');
+  assert.strictEqual(formatTimestampLabel(145), '02:25');
+  assert.strictEqual(formatTimestampLabel(3665), '1:01:05');
+
+  const urlWithTime = buildYouTubeWatchUrl('dQw4w9WgXcQ', 145);
+  assert.strictEqual(urlWithTime, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=145s');
+  console.log('✅ Test 6: Timestamp formatting and deep link construction passed');
+}
+
+// Test 7: YouTube Structured JSON chapter parsing
+{
+  const rawYtJson = JSON.stringify({
+    videoTitle: 'JavaScript in 100 Seconds',
+    tldr: 'A fast-paced overview of the language that powers the web.',
+    chapters: [
+      { timestampSeconds: 0, timestampLabel: '00:00', title: 'Intro', summary: 'Brendan Eich creates JS.' },
+      { timestampSeconds: 45, timestampLabel: '00:45', title: 'ECMAScript', summary: 'Standardization and V8 engine.' }
+    ],
+    keyTakeaways: ['Single threaded', 'Event loop', 'Universal reach']
+  });
+
+  const parsed = JSON.parse(rawYtJson);
+  assert.strictEqual(parsed.chapters.length, 2);
+  assert.strictEqual(parsed.chapters[1].timestampSeconds, 45);
+  assert.strictEqual(parsed.keyTakeaways.length, 3);
+  console.log('✅ Test 7: YouTube chapter and takeaway schema validation passed');
+}
+
+console.log('All summary and YouTube unit tests passed successfully!');

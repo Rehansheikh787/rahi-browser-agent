@@ -1,0 +1,20 @@
+{
+  "name": "rahi-ai-browser-agent",
+  "version": "1.0.0",
+  "description": "Rahi — Chrome Side-Panel AI Browser Agent (Manifest V3)",
+  "type": "module",
+  "scripts": {
+    "test": "node test/unit/ai_gateway.test.js && node test/unit/summary.test.js",
+    "test:gateway": "node test/unit/ai_gateway.test.js",
+    "test:summary": "node test/unit/summary.test.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "manifest-v3",
+    "ai-agent",
+    "gemini",
+    "browser-agent"
+  ],
+  "author": "Rehan Sheikh",
+  "license": "MIT"
+}
