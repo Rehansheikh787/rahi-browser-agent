@@ -369,6 +369,8 @@ export class ChatController {
     inputElement,
     sendButton,
     refreshButton,
+    clearButton,
+    askScreenButton,
     quickPills,
     getState,
     onStatusNotification,
@@ -377,6 +379,8 @@ export class ChatController {
     this.input = inputElement;
     this.sendBtn = sendButton;
     this.refreshBtn = refreshButton;
+    this.clearBtn = clearButton;
+    this.askScreenBtn = askScreenButton;
     this.quickPills = quickPills;
     this.getState = getState;
     this.notify = onStatusNotification || console.log;
@@ -406,6 +410,18 @@ export class ChatController {
       });
     }
 
+    if (this.clearBtn) {
+      this.clearBtn.addEventListener('click', async () => {
+        await this.clearSession();
+      });
+    }
+
+    if (this.askScreenBtn) {
+      this.askScreenBtn.addEventListener('click', () => {
+        this.handleAskScreen();
+      });
+    }
+
     if (this.quickPills) {
       this.quickPills.forEach((pill) => {
         pill.addEventListener('click', () => {
@@ -420,6 +436,21 @@ export class ChatController {
         });
       });
     }
+  }
+
+  async clearSession() {
+    if (!this.activeTabId) return;
+    const key = `chat_session_${this.activeTabId}`;
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        await chrome.storage.local.remove(key);
+      }
+    } catch (err) {
+      console.warn('[Rahi Chat] Failed to clear session from storage:', err);
+    }
+    this.session = { messages: [] };
+    this.renderSession();
+    this.notify('Chat cleared. Started new session.');
   }
 
   async setTab(tab) {

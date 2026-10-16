@@ -190,4 +190,15 @@ TIMESTAMPS:
   console.log('✅ Test 9: Grounded YouTube prompt generation verified');
 }
 
+// Test 10: Clear Summary state reset
+{
+  const { clearSummary } = await import('../../sidepanel/components/summary.js');
+
+  const containerMock = { innerHTML: '<div class="summary-card">Old Active Summary</div>' };
+  clearSummary(containerMock);
+  assert.ok(containerMock.innerHTML.includes('No summary generated yet'), 'Must reset to empty state');
+  assert.ok(containerMock.innerHTML.includes('empty-state'), 'Must contain empty-state class');
+  console.log('✅ Test 10: Clear Summary reset logic verified');
+}
+
 console.log('All summary and YouTube unit tests passed successfully!');

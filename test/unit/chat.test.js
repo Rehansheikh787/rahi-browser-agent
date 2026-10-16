@@ -158,4 +158,35 @@ console.log('Testing Grounded Page Chat & Streaming Logic...');
   console.log('✅ Test 6: Browser restricted URLs correctly guarded against injection');
 }
 
+// Test 7: ChatController Session Reset / New Chat Logic
+{
+  const { ChatController } = await import('../../sidepanel/components/chat.js');
+
+  let rendered = false;
+  let notifiedMsg = '';
+
+  const mockController = {
+    activeTabId: 42,
+    session: {
+      messages: [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'World' }
+      ]
+    },
+    renderSession() {
+      rendered = true;
+    },
+    notify(msg) {
+      notifiedMsg = msg;
+    }
+  };
+
+  await ChatController.prototype.clearSession.call(mockController);
+
+  assert.strictEqual(mockController.session.messages.length, 0, 'Messages must be cleared');
+  assert.strictEqual(rendered, true, 'renderSession must be invoked to show fresh greeting');
+  assert.ok(notifiedMsg.includes('Chat cleared'), 'Must notify user of clear');
+  console.log('✅ Test 7: Chat session reset and New Chat state verified');
+}
+
 console.log('All Grounded Chat and Streaming unit tests passed successfully!');

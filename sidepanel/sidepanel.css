@@ -200,6 +200,12 @@ body {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .section-title {
   font-weight: 600;
   font-size: 13px;
@@ -348,6 +354,30 @@ body {
   padding: 6px 8px;
   outline: none;
   max-height: 100px;
+}
+
+.btn-chat-action {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-chat-action:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--accent-primary);
+  border-color: var(--border-subtle);
+  transform: translateY(-1px);
 }
 
 .btn-send {
@@ -1042,6 +1072,23 @@ body {
 .btn-ghost-sm:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.btn-ghost-sm.danger {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-ghost-sm.danger:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.summary-action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
 }
 
 .btn-ghost-xs {

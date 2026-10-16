@@ -369,6 +369,20 @@ function parseSecondsFromLabel(label) {
 }
 
 /**
+ * Resets summary container to initial empty state
+ * @param {HTMLElement} container
+ */
+export function clearSummary(container) {
+  if (!container) return;
+  container.innerHTML = `
+    <div class="empty-state">
+      <span class="empty-icon">📄</span>
+      <p>No summary generated yet. Click <strong>Summarise Current Page</strong> or enter a YouTube link above.</p>
+    </div>
+  `;
+}
+
+/**
  * Renders the structured summary card into the DOM container
  * @param {HTMLElement} container
  * @param {Object} summaryData
@@ -427,9 +441,20 @@ export function renderSummaryCard(container, summaryData) {
       <div class="summary-card-footer">
         <button class="btn-ghost-sm" id="btnCopySummary">📋 Copy Summary</button>
         <button class="btn-ghost-sm" id="btnExportMarkdown">📝 Export Markdown</button>
+        <button class="btn-ghost-sm danger" id="btnClearSummaryCard">🗑️ Clear</button>
       </div>
     </div>
   `;
+
+  // Bind Clear Button
+  const btnClear = container.querySelector('#btnClearSummaryCard');
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      clearSummary(container);
+      const ytInput = document.getElementById('youtubeUrlInput');
+      if (ytInput) ytInput.value = '';
+    });
+  }
 
   // Bind Copy Buttons
   const btnCopy = container.querySelector('#btnCopySummary');
@@ -513,9 +538,20 @@ function renderYouTubeSummaryCard(container, data) {
       <div class="summary-card-footer">
         <button class="btn-ghost-sm" id="btnCopyYtSummary">📋 Copy Notes</button>
         <button class="btn-ghost-sm" id="btnExportYtMarkdown">📝 Export Markdown</button>
+        <button class="btn-ghost-sm danger" id="btnClearYtSummaryCard">🗑️ Clear</button>
       </div>
     </div>
   `;
+
+  // Bind Clear Button
+  const btnClear = container.querySelector('#btnClearYtSummaryCard');
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      clearSummary(container);
+      const ytInput = document.getElementById('youtubeUrlInput');
+      if (ytInput) ytInput.value = '';
+    });
+  }
 
   // Bind Timestamp Clicks
   container.querySelectorAll('.yt-timestamp-btn').forEach((btn) => {

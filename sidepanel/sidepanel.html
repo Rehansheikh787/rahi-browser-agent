@@ -60,7 +60,12 @@
             <span class="page-meta-icon">🌐</span>
             <span class="page-title" id="chatPageTitle">Active Page Loading...</span>
           </div>
-          <button class="btn-ghost-sm" id="btnRefreshContext" title="Refresh Page Context">🔄</button>
+          <div class="header-actions">
+            <button class="btn-ghost-sm" id="btnClearChat" title="Clear conversation & start new chat">
+              <span>➕ New Chat</span>
+            </button>
+            <button class="btn-ghost-sm" id="btnRefreshContext" title="Refresh Page Context">🔄</button>
+          </div>
         </div>
 
         <div class="chat-messages" id="chatMessages">
@@ -79,6 +84,9 @@
         </div>
 
         <div class="chat-input-bar">
+          <button class="btn-chat-action" id="btnChatAskScreen" title="Ask about screen (drag to crop screenshot)">
+            <span>📷</span>
+          </button>
           <textarea class="chat-textarea" id="chatInput" placeholder="Ask anything about this page..." rows="1"></textarea>
           <button class="btn-send" id="btnSendMessage" title="Send (Enter)">
             <span>➤</span>
@@ -95,6 +103,11 @@
           <div class="url-input-group">
             <input type="text" id="youtubeUrlInput" placeholder="Or paste YouTube URL (e.g. youtube.com/watch?v=...)">
             <button class="btn-secondary" id="btnSummarizeYoutube">Summarise Video</button>
+          </div>
+          <div class="summary-action-row">
+            <button class="btn-ghost-sm" id="btnResetSummary" title="Clear summary to start fresh">
+              <span>🗑️ Clear Summary</span>
+            </button>
           </div>
         </div>
 

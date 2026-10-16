@@ -4,7 +4,7 @@
  * language toggle, and inter-component routing.
  */
 
-import { summarizeCurrentPage, summarizeYouTubeVideo, renderSummaryCard } from './components/summary.js';
+import { summarizeCurrentPage, summarizeYouTubeVideo, renderSummaryCard, clearSummary } from './components/summary.js';
 import { ChatController } from './components/chat.js';
 import { buildContextActionPrompt } from '../background/context_menus.js';
 
@@ -69,6 +69,9 @@ const elements = {
   chatMessages: document.getElementById('chatMessages'),
   chatInput: document.getElementById('chatInput'),
   btnSendMessage: document.getElementById('btnSendMessage'),
+  btnRefreshContext: document.getElementById('btnRefreshContext'),
+  btnClearChat: document.getElementById('btnClearChat'),
+  btnChatAskScreen: document.getElementById('btnChatAskScreen'),
   quickPills: document.querySelectorAll('.quick-pill'),
 
   // Summary View Elements
@@ -76,6 +79,7 @@ const elements = {
   summaryContainer: document.getElementById('summaryContainer'),
   youtubeUrlInput: document.getElementById('youtubeUrlInput'),
   btnSummarizeYoutube: document.getElementById('btnSummarizeYoutube'),
+  btnResetSummary: document.getElementById('btnResetSummary'),
 };
 
 /**
@@ -143,6 +147,8 @@ function setupChatHandlers() {
     inputElement: elements.chatInput,
     sendButton: elements.btnSendMessage,
     refreshButton: elements.btnRefreshContext,
+    clearButton: elements.btnClearChat,
+    askScreenButton: elements.btnChatAskScreen,
     quickPills: elements.quickPills,
     getState: () => state,
     onStatusNotification: (msg) => {
@@ -286,6 +292,14 @@ function setupSummaryHandlers() {
       if (e.key === 'Enter') {
         elements.btnSummarizeYoutube.click();
       }
+    });
+  }
+
+  // Clear / Reset Summary Button
+  if (elements.btnResetSummary && elements.summaryContainer) {
+    elements.btnResetSummary.addEventListener('click', () => {
+      clearSummary(elements.summaryContainer);
+      if (elements.youtubeUrlInput) elements.youtubeUrlInput.value = '';
     });
   }
 }
