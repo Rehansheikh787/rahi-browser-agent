@@ -158,9 +158,6 @@ function isElementVisible(el) {
     } catch (_) {}
   }
 
-  // Check if completely offscreen outside document bounds
-  if (rect.bottom < 0 || rect.right < 0) return false;
-
   return true;
 }
 

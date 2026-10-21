@@ -89,10 +89,10 @@ console.log('Testing Interactive Element Scanner & Manifest Compactor...');
   };
   assert.strictEqual(isElementVisible(zeroSizeEl), false);
 
-  const offscreenEl = {
-    getBoundingClientRect: () => ({ top: -200, left: -200, width: 100, height: 100, bottom: -100, right: -100 })
+  const zeroHeightEl = {
+    getBoundingClientRect: () => ({ top: 100, left: 50, width: 200, height: 0, bottom: 100, right: 250 })
   };
-  assert.strictEqual(isElementVisible(offscreenEl), false);
+  assert.strictEqual(isElementVisible(zeroHeightEl), false);
 
   console.log('✅ Test 3: Element visibility heuristics verified');
 }

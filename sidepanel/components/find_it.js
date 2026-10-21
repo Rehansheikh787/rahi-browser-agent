@@ -57,6 +57,7 @@ export async function findAndHighlightElement({
   tabId,
   query,
   apiKey,
+  groqApiKey = null,
   model = 'gemini-3.5-flash-lite',
   language = 'en',
 }) {
@@ -106,7 +107,7 @@ export async function findAndHighlightElement({
 
   const aiResult = await callAIWithFailover({
     geminiApiKey: apiKey,
-    groqApiKey: params.groqApiKey || null,
+    groqApiKey: groqApiKey || null,
     model,
     prompt,
     systemInstruction,
@@ -118,11 +119,11 @@ export async function findAndHighlightElement({
 
   // 4. Parse JSON decision
   const decision = extractActionJSON(responseText);
-  if (!decision || !decision.targetId) {
+  const targetId = Number(decision?.targetId ?? decision?.id ?? decision?.elementId);
+  if (!targetId || isNaN(targetId)) {
     throw new Error(decision?.explanation || `Could not find an element matching "${query}" on this page.`);
   }
 
-  const targetId = Number(decision.targetId);
   const matchedElement = manifest.find((m) => Number(m.id) === targetId);
 
   // 5. Highlight element with pulse ring on page

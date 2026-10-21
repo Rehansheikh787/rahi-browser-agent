@@ -263,27 +263,27 @@ function updateBadgePositions() {
  * @param {boolean} [scrollIntoView=true]
  */
 function highlightElement(targetId, scrollIntoView = true) {
-  if (!shadowRoot) return false;
+  const shadow = getOrCreateShadowRoot();
+  if (!shadow) return false;
 
   const idNum = Number(targetId);
-  const container = shadowRoot.querySelector('.rahi-badge-container');
-  if (!container) return false;
+  const container = shadow.querySelector('.rahi-badge-container');
 
   // Remove existing highlight
-  const existingHighlights = shadowRoot.querySelectorAll('.rahi-highlight');
+  const existingHighlights = shadow.querySelectorAll('.rahi-highlight');
   existingHighlights.forEach((el) => el.classList.remove('rahi-highlight'));
 
-  const existingRing = shadowRoot.querySelector('.rahi-element-ring');
+  const existingRing = shadow.querySelector('.rahi-element-ring');
   if (existingRing) existingRing.remove();
 
-  // Find badge
+  // Find badge if exists
   const badgeObj = activeBadges.find((b) => Number(b.id) === idNum);
-  if (!badgeObj) return false;
-
-  badgeObj.badgeEl.classList.add('rahi-highlight');
+  if (badgeObj && badgeObj.badgeEl) {
+    badgeObj.badgeEl.classList.add('rahi-highlight');
+  }
 
   // Find underlying element
-  const targetEl = badgeObj.targetEl || 
+  const targetEl = badgeObj?.targetEl || 
     (window.__rahiScannedElements ? window.__rahiScannedElements[idNum - 1] : null);
 
   if (targetEl && typeof targetEl.getBoundingClientRect === 'function') {
