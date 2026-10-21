@@ -5,13 +5,23 @@
  */
 
 import assert from 'node:assert';
-import {
-  computeElementLabel,
-  classifyElementType,
-  isElementVisible,
-  scanInteractiveElements,
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Load content/scanner.js into scope
+const scriptPath = resolve(process.cwd(), 'content/scanner.js');
+const scriptContent = readFileSync(scriptPath, 'utf8');
+const fn = new Function('window', 'globalThis', scriptContent);
+const mockWindow = {};
+fn(mockWindow, globalThis);
+
+const {
+  rahiComputeElementLabel: computeElementLabel,
+  rahiClassifyElementType: classifyElementType,
+  rahiIsElementVisible: isElementVisible,
+  rahiScanInteractiveElements: scanInteractiveElements,
   INTERACTIVE_SELECTOR
-} from '../../content/scanner.js';
+} = globalThis;
 
 console.log('Testing Interactive Element Scanner & Manifest Compactor...');
 

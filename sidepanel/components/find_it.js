@@ -67,7 +67,14 @@ export async function findAndHighlightElement({
     throw new Error('Please enter an element or button name to find');
   }
 
-  // 1. Scan interactive elements directly in-tab
+  // 1. Ensure scripts are injected and scan interactive elements
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content/scanner.js', 'content/badge_overlay.js', 'content/executor.js'],
+    });
+  } catch (_) {}
+
   const scanResults = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {

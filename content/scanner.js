@@ -13,7 +13,7 @@ if (typeof window !== 'undefined') {
 /**
  * Standard CSS selector matching all interactive candidates
  */
-export const INTERACTIVE_SELECTOR = [
+const INTERACTIVE_SELECTOR = [
   'button',
   'a[href]',
   'input:not([type="hidden"])',
@@ -35,7 +35,7 @@ export const INTERACTIVE_SELECTOR = [
  * @param {Element} el
  * @returns {string}
  */
-export function computeElementLabel(el) {
+function computeElementLabel(el) {
   if (!el) return '';
 
   // 1. Explicit aria-label
@@ -107,7 +107,7 @@ export function computeElementLabel(el) {
  * @param {Element} el
  * @returns {string}
  */
-export function classifyElementType(el) {
+function classifyElementType(el) {
   if (!el || !el.tagName) return 'unknown';
   const tag = el.tagName.toLowerCase();
   const role = el.getAttribute?.('role')?.toLowerCase();
@@ -140,7 +140,7 @@ export function classifyElementType(el) {
  * @param {Element} el
  * @returns {boolean}
  */
-export function isElementVisible(el) {
+function isElementVisible(el) {
   if (!el || !el.getBoundingClientRect) return false;
 
   // Check dimensions
@@ -169,7 +169,7 @@ export function isElementVisible(el) {
  * @param {Element|Document} [root=document]
  * @returns {Array<Object>} Compact action manifest
  */
-export function scanInteractiveElements(root = typeof document !== 'undefined' ? document : null) {
+function scanInteractiveElements(root = typeof document !== 'undefined' ? document : null) {
   if (!root || !root.querySelectorAll) {
     return [];
   }
@@ -234,4 +234,15 @@ if (typeof window !== 'undefined') {
   window.rahiScanInteractiveElements = scanInteractiveElements;
   window.rahiComputeElementLabel = computeElementLabel;
   window.rahiClassifyElementType = classifyElementType;
+  window.rahiIsElementVisible = isElementVisible;
+  window.INTERACTIVE_SELECTOR = INTERACTIVE_SELECTOR;
+}
+
+// Bind to globalThis for node test runners
+if (typeof globalThis !== 'undefined') {
+  globalThis.rahiScanInteractiveElements = scanInteractiveElements;
+  globalThis.rahiComputeElementLabel = computeElementLabel;
+  globalThis.rahiClassifyElementType = classifyElementType;
+  globalThis.rahiIsElementVisible = isElementVisible;
+  globalThis.INTERACTIVE_SELECTOR = INTERACTIVE_SELECTOR;
 }

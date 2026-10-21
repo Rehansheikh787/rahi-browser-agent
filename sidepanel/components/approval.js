@@ -96,6 +96,16 @@ export class AgentApprovalController {
     try {
       this.setStatus('Scanning interactive elements...', 'busy');
 
+      // Ensure content scripts are injected on active tab
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content/scanner.js', 'content/badge_overlay.js', 'content/executor.js'],
+        });
+      } catch (injErr) {
+        console.warn('[Rahi Agent] Injection note:', injErr);
+      }
+
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => {

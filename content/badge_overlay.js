@@ -120,7 +120,7 @@ const OVERLAY_STYLES = `
  * Initializes or retrieves the Shadow DOM root container
  * @returns {ShadowRoot}
  */
-export function getOrCreateShadowRoot() {
+function getOrCreateShadowRoot() {
   if (typeof document === 'undefined') return null;
 
   let host = document.getElementById(BADGE_ROOT_ID);
@@ -160,7 +160,7 @@ export function getOrCreateShadowRoot() {
  * @param {Array<Object>} manifest Array of { id, rect, type, label }
  * @param {Array<Element>} [elementsRef] Optional direct DOM element references
  */
-export function showBadges(manifest = [], elementsRef = null) {
+function showBadges(manifest = [], elementsRef = null) {
   const shadow = getOrCreateShadowRoot();
   if (!shadow) return;
 
@@ -231,7 +231,7 @@ export function showBadges(manifest = [], elementsRef = null) {
 /**
  * Recalculates badge coordinates on page scroll or resize
  */
-export function updateBadgePositions() {
+function updateBadgePositions() {
   if (!activeBadges.length || typeof window === 'undefined') return;
 
   const scrollX = window.scrollX || window.pageXOffset || 0;
@@ -262,7 +262,7 @@ export function updateBadgePositions() {
  * @param {number|string} targetId
  * @param {boolean} [scrollIntoView=true]
  */
-export function highlightElement(targetId, scrollIntoView = true) {
+function highlightElement(targetId, scrollIntoView = true) {
   if (!shadowRoot) return false;
 
   const idNum = Number(targetId);
@@ -313,7 +313,7 @@ export function highlightElement(targetId, scrollIntoView = true) {
 /**
  * Removes all badges, highlights, and cleans up event listeners
  */
-export function removeBadges() {
+function removeBadges() {
   if (shadowRoot) {
     const container = shadowRoot.querySelector('.rahi-badge-container');
     if (container) container.innerHTML = '';
@@ -339,7 +339,18 @@ export function removeBadges() {
 
 // Attach to window for in-tab script execution
 if (typeof window !== 'undefined') {
+  window.rahiGetOrCreateShadowRoot = getOrCreateShadowRoot;
   window.rahiShowBadges = showBadges;
   window.rahiHighlightElement = highlightElement;
   window.rahiRemoveBadges = removeBadges;
+  window.rahiUpdateBadgePositions = updateBadgePositions;
+}
+
+// Attach to globalThis for node test runners
+if (typeof globalThis !== 'undefined') {
+  globalThis.rahiGetOrCreateShadowRoot = getOrCreateShadowRoot;
+  globalThis.rahiShowBadges = showBadges;
+  globalThis.rahiHighlightElement = highlightElement;
+  globalThis.rahiRemoveBadges = removeBadges;
+  globalThis.rahiUpdateBadgePositions = updateBadgePositions;
 }

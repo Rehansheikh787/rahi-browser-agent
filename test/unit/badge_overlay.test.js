@@ -85,13 +85,21 @@ global.window = {
 
 console.log('Testing Shadow DOM Numbered Badges Overlay...');
 
-// Import overlay module dynamically with our mock environment
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Load content/badge_overlay.js into mock window/global scope
+const badgeScriptPath = resolve(process.cwd(), 'content/badge_overlay.js');
+const badgeScriptContent = readFileSync(badgeScriptPath, 'utf8');
+const fn = new Function('window', 'globalThis', 'document', badgeScriptContent);
+fn(global.window, globalThis, mockDoc);
+
 const {
-  getOrCreateShadowRoot,
-  showBadges,
-  highlightElement,
-  removeBadges
-} = await import('../../content/badge_overlay.js');
+  rahiGetOrCreateShadowRoot: getOrCreateShadowRoot,
+  rahiShowBadges: showBadges,
+  rahiHighlightElement: highlightElement,
+  rahiRemoveBadges: removeBadges
+} = globalThis;
 
 // Test 1: Shadow Root Creation
 {

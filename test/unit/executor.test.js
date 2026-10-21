@@ -55,14 +55,23 @@ global.window = {
 
 console.log('Testing Synthetic Event Executor...');
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Load content/executor.js into scope
+const executorScriptPath = resolve(process.cwd(), 'content/executor.js');
+const executorScriptContent = readFileSync(executorScriptPath, 'utf8');
+const fn = new Function('window', 'globalThis', 'document', executorScriptContent);
+fn(global.window, globalThis, global.document);
+
 const {
-  resolveTargetElement,
-  executeClick,
-  executeType,
-  executeSelect,
-  executeScroll,
-  dispatchBrowserAction
-} = await import('../../content/executor.js');
+  rahiResolveTargetElement: resolveTargetElement,
+  rahiExecuteClick: executeClick,
+  rahiExecuteType: executeType,
+  rahiExecuteSelect: executeSelect,
+  rahiExecuteScroll: executeScroll,
+  rahiDispatchBrowserAction: dispatchBrowserAction
+} = globalThis;
 
 // Test 1: Resolve Target Element from Scanned Elements
 {

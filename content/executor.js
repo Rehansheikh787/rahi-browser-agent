@@ -10,7 +10,7 @@
  * @param {number|string} targetId
  * @returns {Element|null}
  */
-export function resolveTargetElement(targetId) {
+function resolveTargetElement(targetId) {
   const index = Number(targetId) - 1;
   if (
     typeof window !== 'undefined' &&
@@ -32,7 +32,7 @@ export function resolveTargetElement(targetId) {
  * @param {Element} el
  * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
  */
-export async function executeClick(el) {
+async function executeClick(el) {
   if (!el) {
     return { success: false, error: 'Target element is null or not found' };
   }
@@ -93,7 +93,7 @@ export async function executeClick(el) {
  * @param {string} value Text value to enter
  * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
  */
-export async function executeType(el, value) {
+async function executeType(el, value) {
   if (!el) {
     return { success: false, error: 'Target element is null or not found' };
   }
@@ -145,7 +145,7 @@ export async function executeType(el, value) {
  * @param {string} value Option value or text to select
  * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
  */
-export async function executeSelect(el, value) {
+async function executeSelect(el, value) {
   if (!el) {
     return { success: false, error: 'Target element is null or not found' };
   }
@@ -192,7 +192,7 @@ export async function executeSelect(el, value) {
  * @param {number} [amount=300]
  * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
  */
-export async function executeScroll(direction = 'down', amount = 300) {
+async function executeScroll(direction = 'down', amount = 300) {
   try {
     const delta = direction === 'down' ? Math.abs(amount) : -Math.abs(amount);
     if (typeof window !== 'undefined' && typeof window.scrollBy === 'function') {
@@ -212,7 +212,7 @@ export async function executeScroll(direction = 'down', amount = 300) {
  * @param {Object} action { type, targetId, value, direction, amount }
  * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
  */
-export async function dispatchBrowserAction(action) {
+async function dispatchBrowserAction(action) {
   if (!action || !action.type) {
     return { success: false, error: 'Action type missing' };
   }
@@ -259,4 +259,15 @@ if (typeof window !== 'undefined') {
   window.rahiExecuteType = executeType;
   window.rahiExecuteSelect = executeSelect;
   window.rahiExecuteScroll = executeScroll;
+  window.rahiResolveTargetElement = resolveTargetElement;
+}
+
+// Bind to globalThis for node test runners
+if (typeof globalThis !== 'undefined') {
+  globalThis.rahiDispatchBrowserAction = dispatchBrowserAction;
+  globalThis.rahiExecuteClick = executeClick;
+  globalThis.rahiExecuteType = executeType;
+  globalThis.rahiExecuteSelect = executeSelect;
+  globalThis.rahiExecuteScroll = executeScroll;
+  globalThis.rahiResolveTargetElement = resolveTargetElement;
 }
