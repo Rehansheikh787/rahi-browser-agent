@@ -6,9 +6,11 @@
 
 import { summarizeCurrentPage, summarizeYouTubeVideo, renderSummaryCard, clearSummary } from './components/summary.js';
 import { ChatController } from './components/chat.js';
+import { AgentApprovalController } from './components/approval.js';
 import { buildContextActionPrompt } from '../background/context_menus.js';
 
 let chatController = null;
+let agentController = null;
 
 // Global State Cache
 const state = {
@@ -80,6 +82,25 @@ const elements = {
   youtubeUrlInput: document.getElementById('youtubeUrlInput'),
   btnSummarizeYoutube: document.getElementById('btnSummarizeYoutube'),
   btnResetSummary: document.getElementById('btnResetSummary'),
+
+  // Agent View Elements
+  agentGoalInput: document.getElementById('agentGoalInput'),
+  btnStartAgent: document.getElementById('btnStartAgent'),
+  btnFindElement: document.getElementById('btnFindElement'),
+  btnScanElements: document.getElementById('btnScanElements'),
+  btnClearBadges: document.getElementById('btnClearBadges'),
+  agentStatusPanel: document.getElementById('agentStatusPanel'),
+  actionApprovalCard: document.getElementById('actionApprovalCard'),
+  approvalStepNumber: document.getElementById('approvalStepNumber'),
+  approvalConsequentialBadge: document.getElementById('approvalConsequentialBadge'),
+  approvalTargetPreview: document.getElementById('approvalTargetPreview'),
+  approvalReason: document.getElementById('approvalReason'),
+  btnApproveAction: document.getElementById('btnApproveAction'),
+  btnDryRunAction: document.getElementById('btnDryRunAction'),
+  btnSkipAction: document.getElementById('btnSkipAction'),
+  btnStopAction: document.getElementById('btnStopAction'),
+  agentLogList: document.getElementById('agentLogList'),
+  btnClearLog: document.getElementById('btnClearLog'),
 };
 
 /**
@@ -90,11 +111,24 @@ async function init() {
   setupLanguageToggle();
   setupChatHandlers();
   setupSummaryHandlers();
+  setupAgentController();
   setupSettingsHandlers();
   setupProfileHandlers();
   await loadStorageData();
   await refreshActiveTabInfo();
   await checkPendingContextAction();
+}
+
+/**
+ * Agent Approval Controller Initialization
+ */
+function setupAgentController() {
+  agentController = new AgentApprovalController({
+    elements,
+    getSettings: () => state.settings,
+    getUserProfile: () => state.userProfile,
+    getActiveTab: () => state.activeTab,
+  });
 }
 
 /**

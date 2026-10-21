@@ -47,6 +47,9 @@
       "js": [
         "lib/readability.js",
         "content/extractor.js",
+        "content/scanner.js",
+        "content/badge_overlay.js",
+        "content/executor.js",
         "content/screenshot_crop.js",
         "content/content.js"
       ],

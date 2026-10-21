@@ -4,13 +4,14 @@
   "description": "Rahi — Chrome Side-Panel AI Browser Agent (Manifest V3)",
   "type": "module",
   "scripts": {
-    "test": "node test/unit/ai_gateway.test.js && node test/unit/summary.test.js && node test/unit/chat.test.js && node test/unit/context_menus.test.js && node test/unit/screenshot.test.js && node test/unit/resilience.test.js",
+    "test": "node test/unit/ai_gateway.test.js && node test/unit/summary.test.js && node test/unit/chat.test.js && node test/unit/context_menus.test.js && node test/unit/screenshot.test.js && node test/unit/resilience.test.js && node test/unit/scanner.test.js && node test/unit/badge_overlay.test.js && node test/unit/schema_validator.test.js && node test/unit/executor.test.js && node test/unit/find_it.test.js && node test/unit/approval.test.js",
     "test:gateway": "node test/unit/ai_gateway.test.js",
     "test:summary": "node test/unit/summary.test.js",
     "test:chat": "node test/unit/chat.test.js",
     "test:context": "node test/unit/context_menus.test.js",
     "test:screenshot": "node test/unit/screenshot.test.js",
-    "test:resilience": "node test/unit/resilience.test.js"
+    "test:resilience": "node test/unit/resilience.test.js",
+    "test:phase3": "node test/unit/scanner.test.js && node test/unit/badge_overlay.test.js && node test/unit/schema_validator.test.js && node test/unit/executor.test.js && node test/unit/find_it.test.js && node test/unit/approval.test.js"
   },
   "keywords": [
     "chrome-extension",

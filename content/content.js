@@ -85,5 +85,78 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  // 5. DOM Element Scanner
+  if (message.action === 'SCAN_ELEMENTS') {
+    try {
+      if (typeof window.rahiScanInteractiveElements === 'function') {
+        const manifest = window.rahiScanInteractiveElements();
+        sendResponse({ success: true, manifest });
+      } else {
+        sendResponse({ success: false, error: 'Scanner module not loaded' });
+      }
+    } catch (scanErr) {
+      sendResponse({ success: false, error: scanErr.message });
+    }
+    return false;
+  }
+
+  // 6. Numbered Badges Overlay
+  if (message.action === 'SHOW_BADGES') {
+    try {
+      if (typeof window.rahiShowBadges === 'function') {
+        window.rahiShowBadges(message.manifest || []);
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Badge overlay module not loaded' });
+      }
+    } catch (badgeErr) {
+      sendResponse({ success: false, error: badgeErr.message });
+    }
+    return false;
+  }
+
+  // 7. Pulse Highlight Specific Element
+  if (message.action === 'HIGHLIGHT_ELEMENT') {
+    try {
+      if (typeof window.rahiHighlightElement === 'function') {
+        const highlighted = window.rahiHighlightElement(message.targetId);
+        sendResponse({ success: true, highlighted });
+      } else {
+        sendResponse({ success: false, error: 'Badge overlay module not loaded' });
+      }
+    } catch (hlErr) {
+      sendResponse({ success: false, error: hlErr.message });
+    }
+    return false;
+  }
+
+  // 8. Clear Numbered Badges
+  if (message.action === 'CLEAR_BADGES') {
+    try {
+      if (typeof window.rahiRemoveBadges === 'function') {
+        window.rahiRemoveBadges();
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: true });
+      }
+    } catch (clearErr) {
+      sendResponse({ success: false, error: clearErr.message });
+    }
+    return false;
+  }
+
+  // 9. Execute Synthetic Action
+  if (message.action === 'EXECUTE_ACTION') {
+    if (typeof window.rahiDispatchBrowserAction === 'function') {
+      window.rahiDispatchBrowserAction(message.action)
+        .then((result) => sendResponse(result))
+        .catch((err) => sendResponse({ success: false, error: err.message }));
+      return true; // Keep message channel open for async execution
+    } else {
+      sendResponse({ success: false, error: 'Action executor module not loaded' });
+      return false;
+    }
+  }
+
   return false;
 });
