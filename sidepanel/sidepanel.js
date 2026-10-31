@@ -7,10 +7,14 @@
 import { summarizeCurrentPage, summarizeYouTubeVideo, renderSummaryCard, clearSummary } from './components/summary.js';
 import { ChatController } from './components/chat.js';
 import { AgentApprovalController } from './components/approval.js';
+import { ProfileController, sanitizeProfile } from './components/profile.js';
+import { SkillsController } from './components/skills.js';
 import { buildContextActionPrompt } from '../background/context_menus.js';
 
 let chatController = null;
 let agentController = null;
+let profileController = null;
+let skillsController = null;
 
 // Global State Cache
 const state = {
@@ -66,7 +70,16 @@ const elements = {
   profSkills: document.getElementById('profSkills'),
   profGithub: document.getElementById('profGithub'),
   profLinkedin: document.getElementById('profLinkedin'),
+  profPortfolio: document.getElementById('profPortfolio'),
   btnSaveProfile: document.getElementById('btnSaveProfile'),
+
+  // Skills View Elements
+  skillsList: document.getElementById('skillsList'),
+  btnExportSkills: document.getElementById('btnExportSkills'),
+  btnImportSkills: document.getElementById('btnImportSkills'),
+  skillsFileInput: document.getElementById('skillsFileInput'),
+  btnOpenCreateSkill: document.getElementById('btnOpenCreateSkill'),
+
   // Chat View Elements
   chatMessages: document.getElementById('chatMessages'),
   chatInput: document.getElementById('chatInput'),
@@ -95,6 +108,8 @@ const elements = {
   approvalConsequentialBadge: document.getElementById('approvalConsequentialBadge'),
   approvalTargetPreview: document.getElementById('approvalTargetPreview'),
   approvalReason: document.getElementById('approvalReason'),
+  consequentialConsentBox: document.getElementById('consequentialConsentBox'),
+  chkConsequentialConsent: document.getElementById('chkConsequentialConsent'),
   btnApproveAction: document.getElementById('btnApproveAction'),
   btnDryRunAction: document.getElementById('btnDryRunAction'),
   btnSkipAction: document.getElementById('btnSkipAction'),
@@ -112,8 +127,9 @@ async function init() {
   setupChatHandlers();
   setupSummaryHandlers();
   setupAgentController();
+  setupProfileController();
+  setupSkillsController();
   setupSettingsHandlers();
-  setupProfileHandlers();
   await loadStorageData();
   await refreshActiveTabInfo();
   await checkPendingContextAction();
@@ -126,8 +142,52 @@ function setupAgentController() {
   agentController = new AgentApprovalController({
     elements,
     getSettings: () => state.settings,
-    getUserProfile: () => state.userProfile,
+    getUserProfile: () => (profileController ? profileController.getProfile() : state.userProfile),
     getActiveTab: () => state.activeTab,
+  });
+}
+
+/**
+ * Profile Controller Initialization
+ */
+function setupProfileController() {
+  profileController = new ProfileController({
+    elements,
+    onProfileSaved: (savedProfile) => {
+      state.userProfile = savedProfile;
+    },
+  });
+}
+
+/**
+ * Skills Controller Initialization
+ */
+function setupSkillsController() {
+  skillsController = new SkillsController({
+    elements,
+    getProfile: () => (profileController ? profileController.getProfile() : (state.userProfile || {})),
+    getActiveTab: () => state.activeTab,
+    onSwitchTab: (tabId) => switchTab(tabId),
+    onExecuteInChat: async ({ prompt, skillName }) => {
+      if (chatController) {
+        await chatController.sendUserPrompt(prompt, {
+          displayPrompt: `**[Skill: ${skillName}]**\n${prompt}`,
+        });
+      }
+    },
+    onExecuteInSummary: async ({ skillName, promptTemplate }) => {
+      if (elements.btnSummarizePage) {
+        elements.btnSummarizePage.click();
+      }
+    },
+    onExecuteInAgent: async ({ goal, isFormFill }) => {
+      if (elements.agentGoalInput) {
+        elements.agentGoalInput.value = goal;
+      }
+      if (agentController) {
+        await agentController.startTask(goal);
+      }
+    },
   });
 }
 
@@ -454,48 +514,6 @@ function populateSettingsForm() {
   elements.footerModelBadge.textContent = state.settings.defaultModel === 'gemini-3.8-flash'
     ? 'Gemini 3.8 Flash'
     : 'Gemini 3.5 Flash-Lite';
-}
-
-/**
- * Profile Form Handling
- */
-function setupProfileHandlers() {
-  elements.btnSaveProfile.addEventListener('click', async () => {
-    const profile = {
-      fullName: elements.profFullName.value.trim(),
-      email: elements.profEmail.value.trim(),
-      phone: elements.profPhone.value.trim(),
-      college: elements.profCollege.value.trim(),
-      degree: elements.profDegree.value.trim(),
-      preferredTone: elements.profTone.value,
-      skills: elements.profSkills.value.split(',').map((s) => s.trim()).filter(Boolean),
-      links: {
-        github: elements.profGithub.value.trim(),
-        linkedin: elements.profLinkedin.value.trim(),
-      },
-    };
-
-    state.userProfile = profile;
-    try {
-      await chrome.storage.local.set({ userProfile: profile });
-      alert('Profile memory saved locally!');
-    } catch (err) {
-      alert(`Failed to save profile: ${err.message}`);
-    }
-  });
-}
-
-function populateProfileForm() {
-  if (!state.userProfile) return;
-  elements.profFullName.value = state.userProfile.fullName || '';
-  elements.profEmail.value = state.userProfile.email || '';
-  elements.profPhone.value = state.userProfile.phone || '';
-  elements.profCollege.value = state.userProfile.college || '';
-  elements.profDegree.value = state.userProfile.degree || '';
-  elements.profTone.value = state.userProfile.preferredTone || 'formal';
-  elements.profSkills.value = (state.userProfile.skills || []).join(', ');
-  elements.profGithub.value = state.userProfile.links?.github || '';
-  elements.profLinkedin.value = state.userProfile.links?.linkedin || '';
 }
 
 /**

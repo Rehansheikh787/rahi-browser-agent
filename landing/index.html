@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rahi — Autonomous AI Web Browser Agent</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <span class="brand-icon">🧭</span>
+        <span class="brand-title">Rahi</span>
+        <span class="brand-tag">v1.0</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#security">Security</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="https://github.com" target="_blank" class="btn-nav">GitHub ⭐</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-container">
+      <div class="hero-badge">⚡ Manifest V3 • Gemini 3.5 Flash-Lite & 3.8 Flash • Groq Failover</div>
+      <h1 class="hero-title">
+        The Autonomous AI Browser Agent<br>
+        <span class="gradient-text">That Acts With Your Approval</span>
+      </h1>
+      <p class="hero-subtitle">
+        Observe, understand, reason, and act across any website directly from your Chrome Side Panel.
+        From grounded research and YouTube chapters to autonomous form-filling and Shadow DOM badges.
+      </p>
+      <div class="hero-actions">
+        <a href="#quickstart" class="btn-primary-hero">Get Started in 2 Minutes</a>
+        <a href="#architecture" class="btn-secondary-hero">Explore Architecture</a>
+      </div>
+
+      <!-- Mock UI Preview -->
+      <div class="browser-mockup">
+        <div class="mockup-header">
+          <div class="mockup-dots">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <div class="mockup-address">https://en.wikipedia.org/wiki/Artificial_intelligence</div>
+        </div>
+        <div class="mockup-body">
+          <div class="page-preview">
+            <div class="page-skeleton-heading"></div>
+            <div class="page-skeleton-line long"></div>
+            <div class="page-skeleton-line medium"></div>
+            <div class="sample-element-badge">
+              <span class="rahi-pill">#1</span>
+              <button class="mock-btn">Search Wikipedia</button>
+            </div>
+            <div class="sample-element-badge" style="margin-top: 20px;">
+              <span class="rahi-pill">#2</span>
+              <a href="#" class="mock-link">Read Full Documentation →</a>
+            </div>
+          </div>
+          <div class="sidepanel-preview">
+            <div class="sp-header">
+              <div class="sp-brand">🧭 Rahi Agent</div>
+              <span class="sp-status">🟢 Ready</span>
+            </div>
+            <div class="sp-tabs">
+              <span class="sp-tab">Chat</span>
+              <span class="sp-tab">Summary</span>
+              <span class="sp-tab active">⚡ Agent</span>
+              <span class="sp-tab">Skills</span>
+            </div>
+            <div class="sp-card">
+              <div class="sp-card-step">Step 1 of 15</div>
+              <div class="sp-card-target">Action: Click [#1] Search Wikipedia</div>
+              <p class="sp-card-reason">Clicking search bar to enter inquiry.</p>
+              <div class="sp-card-buttons">
+                <span class="btn-mini green">✅ Approve</span>
+                <span class="btn-mini blue">👁️ Dry Run</span>
+                <span class="btn-mini gray">⏭️ Skip</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Core Pillars -->
+  <section class="pillars" id="features">
+    <div class="container">
+      <h2 class="section-heading">Built on Five Core Architectural Pillars</h2>
+      <p class="section-subheading">A complete browser agent operating with determinism and defense-in-depth security.</p>
+      
+      <div class="pillars-grid">
+        <div class="pillar-card">
+          <div class="pillar-icon">👀</div>
+          <h3>1. The Eyes (Observe)</h3>
+          <p>Mozilla Readability article parsing strips noise, ads, and footers. Visual Drag-to-Crop screenshot analysis with high-DPI scaling allows targeted multimodal queries on complex charts and graphics.</p>
+        </div>
+
+        <div class="pillar-card">
+          <div class="pillar-icon">🧠</div>
+          <h3>2. The Brain (Reason)</h3>
+          <p>Grounded Q&A refuses hallucinations when facts are absent. YouTube summarization automatically parses timestamps and video notes into deep clickable links. Bilingual support in English and Hinglish.</p>
+        </div>
+
+        <div class="pillar-card">
+          <div class="pillar-icon">✋</div>
+          <h3>3. The Hands (Act)</h3>
+          <p>Scans visible interactive DOM and overlays isolated Shadow DOM numbered badges. Proposes sequential actions with Dry Run previews and synthetic typing compatible with React controlled inputs.</p>
+        </div>
+
+        <div class="pillar-card">
+          <div class="pillar-icon">🛡️</div>
+          <h3>4. Hardcoded Safety</h3>
+          <p>ADR-003 Defense-in-Depth: Layer 1 Domain Firewall blocks financial and auth portals; Layer 2 Sentinel blocks passwords and OTPs; Layer 3 enforces secondary confirmation for consequential actions.</p>
+        </div>
+
+        <div class="pillar-card">
+          <div class="pillar-icon">👤</div>
+          <h3>5. The Memory</h3>
+          <p>On-device Local Profile Memory stores applicant attributes without third-party tracking. One-Click Skills Hub (<code>rahi-skills-v1</code>) lets you run, create, export, and import customized prompt recipes.</p>
+        </div>
+
+        <div class="pillar-card">
+          <div class="pillar-icon">⚡</div>
+          <h3>Zero-Downtime Resilience</h3>
+          <p>Built with exponential backoff and jitter for free-tier rate limits, plus transparent failover to Groq Llama 3.3 70B when Gemini quotas are exhausted.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Security Section -->
+  <section class="security-section" id="security">
+    <div class="container">
+      <div class="security-box">
+        <div class="security-badge">🛡️ DEFENSE IN DEPTH (ADR-003)</div>
+        <h2>Enterprise-Grade Browser Safety by Design</h2>
+        <p>Unlike cloud browser scrapers that transmit credentials, Rahi executes locally with strict deterministic boundaries:</p>
+        
+        <div class="security-layers">
+          <div class="layer">
+            <span class="layer-num">1</span>
+            <div>
+              <h4>Domain Firewall</h4>
+              <p>Automated agent actions are unconditionally terminated on banking portals, payment processors, and authentication gateways.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <span class="layer-num">2</span>
+            <div>
+              <h4>Sensitive Element Sentinel</h4>
+              <p>Rahi strictly refuses to interact with password fields, OTP inputs, or credit card forms—even if requested by model output.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <span class="layer-num">3</span>
+            <div>
+              <h4>Consequential Action Consent</h4>
+              <p>Actions that submit data, delete content, or complete orders require checking an explicit secondary confirmation checkbox.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quickstart -->
+  <section class="quickstart" id="quickstart">
+    <div class="container">
+      <h2 class="section-heading">Get Started in 3 Simple Steps</h2>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-circle">1</div>
+          <h3>Clone & Load Unpacked</h3>
+          <p>Clone the repository, open <code>chrome://extensions</code>, enable Developer Mode, and click <strong>Load unpacked</strong>.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-circle">2</div>
+          <h3>Add Your API Key</h3>
+          <p>Open Rahi from your Side Panel, navigate to Settings, and paste your free Google Gemini API key. Optionally add a Groq fallback key.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-circle">3</div>
+          <h3>Start Browsing Safely</h3>
+          <p>Summarize any page, ask grounded questions, test One-Click Skills, or let Rahi guide your navigation step-by-step.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div>🧭 <strong>Rahi AI Browser Agent</strong> — Open Source Under MIT License</div>
+      <div>Designed for privacy, reliability, and human control.</div>
+    </div>
+  </footer>
+</body>
+</html>

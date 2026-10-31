@@ -4,14 +4,15 @@
  * Shadow DOM root to prevent host page CSS leaking in or extension styles leaking out.
  */
 
-// Host container ID
-const BADGE_ROOT_ID = 'rahi-badge-root';
+(function () {
+  // Host container ID
+  const BADGE_ROOT_ID = 'rahi-badge-root';
 
-// Cached references
-let badgeRoot = null;
-let shadowRoot = null;
-let activeBadges = [];
-let scrollListenerAttached = false;
+  // Cached references
+  let badgeRoot = null;
+  let shadowRoot = null;
+  let activeBadges = [];
+  let scrollListenerAttached = false;
 
 /**
  * Isolated CSS styles injected directly into Shadow DOM
@@ -337,20 +338,21 @@ function removeBadges() {
   shadowRoot = null;
 }
 
-// Attach to window for in-tab script execution
-if (typeof window !== 'undefined') {
-  window.rahiGetOrCreateShadowRoot = getOrCreateShadowRoot;
-  window.rahiShowBadges = showBadges;
-  window.rahiHighlightElement = highlightElement;
-  window.rahiRemoveBadges = removeBadges;
-  window.rahiUpdateBadgePositions = updateBadgePositions;
-}
+  // Attach to window for in-tab script execution
+  if (typeof window !== 'undefined') {
+    window.rahiGetOrCreateShadowRoot = getOrCreateShadowRoot;
+    window.rahiShowBadges = showBadges;
+    window.rahiHighlightElement = highlightElement;
+    window.rahiRemoveBadges = removeBadges;
+    window.rahiUpdateBadgePositions = updateBadgePositions;
+  }
 
-// Attach to globalThis for node test runners
-if (typeof globalThis !== 'undefined') {
-  globalThis.rahiGetOrCreateShadowRoot = getOrCreateShadowRoot;
-  globalThis.rahiShowBadges = showBadges;
-  globalThis.rahiHighlightElement = highlightElement;
-  globalThis.rahiRemoveBadges = removeBadges;
-  globalThis.rahiUpdateBadgePositions = updateBadgePositions;
-}
+  // Attach to globalThis for node test runners
+  if (typeof globalThis !== 'undefined') {
+    globalThis.rahiGetOrCreateShadowRoot = getOrCreateShadowRoot;
+    globalThis.rahiShowBadges = showBadges;
+    globalThis.rahiHighlightElement = highlightElement;
+    globalThis.rahiRemoveBadges = removeBadges;
+    globalThis.rahiUpdateBadgePositions = updateBadgePositions;
+  }
+})();

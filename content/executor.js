@@ -5,12 +5,13 @@
  * by invoking native property setters and firing complete event lifecycles.
  */
 
-/**
- * Finds the DOM element corresponding to a 1-indexed target ID
- * @param {number|string} targetId
- * @returns {Element|null}
- */
-function resolveTargetElement(targetId) {
+(function () {
+  /**
+   * Finds the DOM element corresponding to a 1-indexed target ID
+   * @param {number|string} targetId
+   * @returns {Element|null}
+   */
+  function resolveTargetElement(targetId) {
   const index = Number(targetId) - 1;
   if (
     typeof window !== 'undefined' &&
@@ -240,6 +241,20 @@ async function dispatchBrowserAction(action) {
     };
   }
 
+  // Layer 2 Safety Guard: Check for sensitive elements (passwords, OTPs, CVVs)
+  const safetyChecker = (typeof window !== 'undefined' && window.rahiCheckElementSafety) ||
+                        (typeof globalThis !== 'undefined' && globalThis.rahiCheckElementSafety);
+  if (typeof safetyChecker === 'function') {
+    const safety = safetyChecker(el);
+    if (!safety.allowed) {
+      return {
+        success: false,
+        blockedBySafety: true,
+        error: safety.reason || 'Action blocked by Rahi Safety Sentinel.',
+      };
+    }
+  }
+
   switch (type) {
     case 'click':
       return await executeClick(el);
@@ -252,22 +267,23 @@ async function dispatchBrowserAction(action) {
   }
 }
 
-// Bind to window for direct in-tab execution
-if (typeof window !== 'undefined') {
-  window.rahiDispatchBrowserAction = dispatchBrowserAction;
-  window.rahiExecuteClick = executeClick;
-  window.rahiExecuteType = executeType;
-  window.rahiExecuteSelect = executeSelect;
-  window.rahiExecuteScroll = executeScroll;
-  window.rahiResolveTargetElement = resolveTargetElement;
-}
+  // Bind to window for direct in-tab execution
+  if (typeof window !== 'undefined') {
+    window.rahiDispatchBrowserAction = dispatchBrowserAction;
+    window.rahiExecuteClick = executeClick;
+    window.rahiExecuteType = executeType;
+    window.rahiExecuteSelect = executeSelect;
+    window.rahiExecuteScroll = executeScroll;
+    window.rahiResolveTargetElement = resolveTargetElement;
+  }
 
-// Bind to globalThis for node test runners
-if (typeof globalThis !== 'undefined') {
-  globalThis.rahiDispatchBrowserAction = dispatchBrowserAction;
-  globalThis.rahiExecuteClick = executeClick;
-  globalThis.rahiExecuteType = executeType;
-  globalThis.rahiExecuteSelect = executeSelect;
-  globalThis.rahiExecuteScroll = executeScroll;
-  globalThis.rahiResolveTargetElement = resolveTargetElement;
-}
+  // Bind to globalThis for node test runners
+  if (typeof globalThis !== 'undefined') {
+    globalThis.rahiDispatchBrowserAction = dispatchBrowserAction;
+    globalThis.rahiExecuteClick = executeClick;
+    globalThis.rahiExecuteType = executeType;
+    globalThis.rahiExecuteSelect = executeSelect;
+    globalThis.rahiExecuteScroll = executeScroll;
+    globalThis.rahiResolveTargetElement = resolveTargetElement;
+  }
+})();

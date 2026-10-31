@@ -5,10 +5,11 @@
  * action manifest for model reasoning.
  */
 
-// Global in-memory storage of scanned elements for direct DOM manipulation
-if (typeof window !== 'undefined') {
-  window.__rahiScannedElements = [];
-}
+(function () {
+  // Global in-memory storage of scanned elements for direct DOM manipulation
+  if (typeof window !== 'undefined' && !window.__rahiScannedElements) {
+    window.__rahiScannedElements = [];
+  }
 
 /**
  * Standard CSS selector matching all interactive candidates
@@ -226,20 +227,21 @@ function scanInteractiveElements(root = typeof document !== 'undefined' ? docume
   return compactManifest;
 }
 
-// Bind to window for in-tab access
-if (typeof window !== 'undefined') {
-  window.rahiScanInteractiveElements = scanInteractiveElements;
-  window.rahiComputeElementLabel = computeElementLabel;
-  window.rahiClassifyElementType = classifyElementType;
-  window.rahiIsElementVisible = isElementVisible;
-  window.INTERACTIVE_SELECTOR = INTERACTIVE_SELECTOR;
-}
+  // Bind to window for in-tab access
+  if (typeof window !== 'undefined') {
+    window.rahiScanInteractiveElements = scanInteractiveElements;
+    window.rahiComputeElementLabel = computeElementLabel;
+    window.rahiClassifyElementType = classifyElementType;
+    window.rahiIsElementVisible = isElementVisible;
+    window.INTERACTIVE_SELECTOR = INTERACTIVE_SELECTOR;
+  }
 
-// Bind to globalThis for node test runners
-if (typeof globalThis !== 'undefined') {
-  globalThis.rahiScanInteractiveElements = scanInteractiveElements;
-  globalThis.rahiComputeElementLabel = computeElementLabel;
-  globalThis.rahiClassifyElementType = classifyElementType;
-  globalThis.rahiIsElementVisible = isElementVisible;
-  globalThis.INTERACTIVE_SELECTOR = INTERACTIVE_SELECTOR;
-}
+  // Bind to globalThis for node test runners
+  if (typeof globalThis !== 'undefined') {
+    globalThis.rahiScanInteractiveElements = scanInteractiveElements;
+    globalThis.rahiComputeElementLabel = computeElementLabel;
+    globalThis.rahiClassifyElementType = classifyElementType;
+    globalThis.rahiIsElementVisible = isElementVisible;
+    globalThis.INTERACTIVE_SELECTOR = INTERACTIVE_SELECTOR;
+  }
+})();

@@ -69,12 +69,23 @@ export async function findAndHighlightElement({
   }
 
   // 1. Ensure scripts are injected and scan interactive elements
+  let isLoaded = false;
   try {
-    await chrome.scripting.executeScript({
+    const check = await chrome.scripting.executeScript({
       target: { tabId },
-      files: ['content/scanner.js', 'content/badge_overlay.js', 'content/executor.js'],
+      func: () => typeof window.rahiScanInteractiveElements === 'function' && typeof window.rahiShowBadges === 'function',
     });
+    isLoaded = check?.[0]?.result === true;
   } catch (_) {}
+
+  if (!isLoaded) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content/scanner.js', 'content/badge_overlay.js', 'content/safety_guard.js', 'content/executor.js'],
+      });
+    } catch (_) {}
+  }
 
   const scanResults = await chrome.scripting.executeScript({
     target: { tabId },

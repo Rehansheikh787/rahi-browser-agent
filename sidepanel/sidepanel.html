@@ -149,6 +149,12 @@
           <div class="card-body">
             <div class="target-element" id="approvalTargetPreview">Target: [#1] Button "Submit"</div>
             <div class="action-reason" id="approvalReason">Clicking submit button to proceed.</div>
+            <div class="consequential-consent-box hidden" id="consequentialConsentBox">
+              <label class="consent-checkbox-label">
+                <input type="checkbox" id="chkConsequentialConsent">
+                <span>I confirm and understand this action will submit data or make changes.</span>
+              </label>
+            </div>
           </div>
           <div class="card-controls">
             <button class="btn-action-approve" id="btnApproveAction">✅ Approve</button>
@@ -174,6 +180,7 @@
         <div class="view-header">
           <span class="section-title">One-Click Skills</span>
           <div class="skills-actions">
+            <button class="btn-ghost-sm" id="btnOpenCreateSkill" title="Create Custom Skill">➕ New Skill</button>
             <button class="btn-ghost-sm" id="btnExportSkills" title="Export Skills JSON">⬇️ Export</button>
             <button class="btn-ghost-sm" id="btnImportSkills" title="Import Skills JSON">⬆️ Import</button>
             <input type="file" id="skillsFileInput" accept=".json" class="hidden">
@@ -238,6 +245,10 @@
           <div class="form-group">
             <label for="profLinkedin">LinkedIn Profile</label>
             <input type="url" id="profLinkedin" placeholder="https://linkedin.com/in/username">
+          </div>
+          <div class="form-group">
+            <label for="profPortfolio">Portfolio / Personal Website</label>
+            <input type="url" id="profPortfolio" placeholder="https://yourportfolio.dev">
           </div>
           <button type="button" class="btn-primary" id="btnSaveProfile">Save Profile</button>
         </form>

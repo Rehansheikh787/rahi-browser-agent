@@ -14,3 +14,6 @@ Thumbs.db
 *.zip
 dist/
 build/
+.serena/
+.playwright-mcp/
+.vscode/

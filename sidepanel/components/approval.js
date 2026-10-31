@@ -6,6 +6,7 @@
 
 import { callAIWithFailover } from '../../background/ai_gateway.js';
 import { validateActionDecision, extractActionJSON } from '../../lib/schema_validator.js';
+import { checkDomainFirewall } from '../../lib/safety_guard.js';
 import { findAndHighlightElement } from './find_it.js';
 
 export class AgentApprovalController {
@@ -64,6 +65,14 @@ export class AgentApprovalController {
     }
 
     // Approval Controls
+    if (this.elements.chkConsequentialConsent) {
+      this.elements.chkConsequentialConsent.addEventListener('change', (e) => {
+        if (this.elements.btnApproveAction) {
+          this.elements.btnApproveAction.disabled = !e.target.checked;
+        }
+      });
+    }
+
     if (this.elements.btnApproveAction) {
       this.elements.btnApproveAction.addEventListener('click', () => this.handleApprove());
     }
@@ -96,14 +105,25 @@ export class AgentApprovalController {
     try {
       this.setStatus('Scanning interactive elements...', 'busy');
 
-      // Ensure content scripts are injected on active tab
+      // Check if scripts are already loaded; if not, inject them
+      let isLoaded = false;
       try {
-        await chrome.scripting.executeScript({
+        const check = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['content/scanner.js', 'content/badge_overlay.js', 'content/executor.js'],
+          func: () => typeof window.rahiScanInteractiveElements === 'function' && typeof window.rahiShowBadges === 'function',
         });
-      } catch (injErr) {
-        console.warn('[Rahi Agent] Injection note:', injErr);
+        isLoaded = check?.[0]?.result === true;
+      } catch (_) {}
+
+      if (!isLoaded) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content/scanner.js', 'content/badge_overlay.js', 'content/safety_guard.js', 'content/executor.js'],
+          });
+        } catch (injErr) {
+          console.warn('[Rahi Agent] Injection note:', injErr);
+        }
       }
 
       const results = await chrome.scripting.executeScript({
@@ -203,6 +223,18 @@ export class AgentApprovalController {
     if (!settings.geminiApiKey) {
       alert('Please enter your Gemini API Key in Settings before starting an agent task.');
       return;
+    }
+
+    // Layer 1 Safety Guard: Domain Firewall Check
+    const activeTab = this.getActiveTab();
+    if (activeTab && activeTab.url) {
+      const firewall = checkDomainFirewall(activeTab.url);
+      if (!firewall.allowed) {
+        this.setStatus('Task Aborted: Financial or Authentication Portal', 'error');
+        this.appendLog(`🛡️ Domain Firewall: ${firewall.reason}`, 'error');
+        alert(firewall.reason);
+        return;
+      }
     }
 
     this.isRunning = true;
@@ -335,7 +367,7 @@ export class AgentApprovalController {
       this.elements.approvalStepNumber.textContent = `Step ${this.currentStep} of ${this.maxStepLimit}`;
     }
 
-    // Consequential Warning Badge
+    // Consequential Warning Badge & Secondary Consent Checkbox (Layer 3 Safety)
     if (this.elements.approvalConsequentialBadge) {
       if (isConsequential) {
         this.elements.approvalConsequentialBadge.classList.remove('hidden');
@@ -343,6 +375,23 @@ export class AgentApprovalController {
       } else {
         this.elements.approvalConsequentialBadge.classList.add('hidden');
         this.elements.actionApprovalCard.classList.remove('consequential-alert');
+      }
+    }
+
+    if (this.elements.consequentialConsentBox) {
+      if (isConsequential) {
+        this.elements.consequentialConsentBox.classList.remove('hidden');
+        if (this.elements.chkConsequentialConsent) {
+          this.elements.chkConsequentialConsent.checked = false;
+        }
+        if (this.elements.btnApproveAction) {
+          this.elements.btnApproveAction.disabled = true;
+        }
+      } else {
+        this.elements.consequentialConsentBox.classList.add('hidden');
+        if (this.elements.btnApproveAction) {
+          this.elements.btnApproveAction.disabled = false;
+        }
       }
     }
 
@@ -371,6 +420,12 @@ export class AgentApprovalController {
     if (this.elements.actionApprovalCard) {
       this.elements.actionApprovalCard.classList.add('hidden');
       this.elements.actionApprovalCard.classList.remove('consequential-alert');
+    }
+    if (this.elements.consequentialConsentBox) {
+      this.elements.consequentialConsentBox.classList.add('hidden');
+    }
+    if (this.elements.btnApproveAction) {
+      this.elements.btnApproveAction.disabled = false;
     }
   }
 
@@ -405,6 +460,13 @@ export class AgentApprovalController {
       const execResult = results?.[0]?.result || { success: false, error: 'No execution result returned' };
 
       if (!execResult.success) {
+        if (execResult.blockedBySafety) {
+          this.appendLog(`🛡️ [Safety Interceptor]: ${execResult.error}`, 'error');
+          this.stopTask(`Safety Block: ${execResult.error}`);
+          alert(execResult.error);
+          return;
+        }
+
         this.appendLog(`❌ Action failed: ${execResult.error}`, 'error');
         this.actionHistory.push({
           step: this.currentStep,
