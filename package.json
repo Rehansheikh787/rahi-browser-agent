@@ -4,7 +4,7 @@
   "description": "Rahi — Chrome Side-Panel AI Browser Agent (Manifest V3)",
   "type": "module",
   "scripts": {
-    "test": "node test/unit/ai_gateway.test.js && node test/unit/summary.test.js && node test/unit/chat.test.js && node test/unit/context_menus.test.js && node test/unit/screenshot.test.js && node test/unit/resilience.test.js && node test/unit/scanner.test.js && node test/unit/badge_overlay.test.js && node test/unit/schema_validator.test.js && node test/unit/executor.test.js && node test/unit/find_it.test.js && node test/unit/approval.test.js && node test/unit/profile.test.js && node test/unit/skills.test.js && node test/unit/safety_guard.test.js",
+    "test": "node test/unit/ai_gateway.test.js && node test/unit/summary.test.js && node test/unit/chat.test.js && node test/unit/context_menus.test.js && node test/unit/screenshot.test.js && node test/unit/resilience.test.js && node test/unit/scanner.test.js && node test/unit/badge_overlay.test.js && node test/unit/schema_validator.test.js && node test/unit/executor.test.js && node test/unit/find_it.test.js && node test/unit/approval.test.js && node test/unit/profile.test.js && node test/unit/skills.test.js && node test/unit/safety_guard.test.js && node test/unit/fixtures.test.js",
     "test:gateway": "node test/unit/ai_gateway.test.js",
     "test:summary": "node test/unit/summary.test.js",
     "test:chat": "node test/unit/chat.test.js",
@@ -12,7 +12,9 @@
     "test:screenshot": "node test/unit/screenshot.test.js",
     "test:resilience": "node test/unit/resilience.test.js",
     "test:phase3": "node test/unit/scanner.test.js && node test/unit/badge_overlay.test.js && node test/unit/schema_validator.test.js && node test/unit/executor.test.js && node test/unit/find_it.test.js && node test/unit/approval.test.js",
-    "test:phase4": "node test/unit/profile.test.js && node test/unit/skills.test.js && node test/unit/safety_guard.test.js"
+    "test:phase4": "node test/unit/profile.test.js && node test/unit/skills.test.js && node test/unit/safety_guard.test.js && node test/unit/fixtures.test.js",
+    "package": "node scripts/package_extension.js",
+    "serve": "node scripts/serve_fixtures.js"
   },
   "keywords": [
     "chrome-extension",
