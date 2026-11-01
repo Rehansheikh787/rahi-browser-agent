@@ -110,3 +110,4 @@ console.log('Testing Agent Trace HTML Exporter...');
 }
 
 console.log('All trace exporter unit tests passed successfully!\n');
+

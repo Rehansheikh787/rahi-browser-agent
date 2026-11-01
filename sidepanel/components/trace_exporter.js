@@ -436,3 +436,4 @@ export function downloadTraceReport(taskRecord, userProfile = null) {
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+

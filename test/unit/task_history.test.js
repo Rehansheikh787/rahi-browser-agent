@@ -143,3 +143,4 @@ globalThis.chrome = {
 }
 
 console.log('All Agent Task History unit tests passed successfully!\n');
+
