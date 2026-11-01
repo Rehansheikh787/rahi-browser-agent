@@ -8,6 +8,7 @@ import { callAIWithFailover } from '../../background/ai_gateway.js';
 import { validateActionDecision, extractActionJSON } from '../../lib/schema_validator.js';
 import { checkDomainFirewall } from '../../lib/safety_guard.js';
 import { findAndHighlightElement } from './find_it.js';
+import { downloadTraceReport } from './trace_exporter.js';
 
 export class AgentApprovalController {
   constructor(options = {}) {
@@ -24,8 +25,10 @@ export class AgentApprovalController {
     this.currentManifest = [];
     this.currentDecision = null;
     this.actionHistory = [];
+    this.taskHistory = [];
 
     this.initEventListeners();
+    this.loadAndRenderTaskHistory();
   }
 
   initEventListeners() {
@@ -90,57 +93,102 @@ export class AgentApprovalController {
     if (this.elements.btnClearLog) {
       this.elements.btnClearLog.addEventListener('click', () => this.clearLog());
     }
+
+    // Clear Task History
+    if (this.elements.btnClearHistory) {
+      this.elements.btnClearHistory.addEventListener('click', () => this.clearTaskHistory());
+    }
+  }
+
+  /**
+   * Resolves the current active tab reliably from side panel context
+   */
+  async resolveActiveTab() {
+    try {
+      if (chrome.tabs?.query) {
+        let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (tabs && tabs[0] && tabs[0].id) return tabs[0];
+        tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs && tabs[0] && tabs[0].id) return tabs[0];
+      }
+    } catch (_) {}
+    return this.getActiveTab();
   }
 
   /**
    * Scans active tab and shows numbered badges over all interactive elements
    */
   async scanAndDisplayBadges() {
-    const tab = this.getActiveTab();
+    const tab = await this.resolveActiveTab();
     if (!tab || !tab.id) {
       this.setStatus('No active web page detected', 'warning');
+      this.appendLog('⚠️ Please focus a browser tab with a web page.', 'warning');
+      return [];
+    }
+
+    // Check for internal browser URLs
+    if (/^(chrome|edge|about|chrome-extension):/i.test(tab.url || '') || tab.url?.includes('chromewebstore.google.com')) {
+      this.setStatus('Internal browser pages not supported', 'warning');
+      this.appendLog('⚠️ Rahi cannot interact with browser internal pages (chrome://, etc.). Please switch to a regular website.', 'warning');
       return [];
     }
 
     try {
       this.setStatus('Scanning interactive elements...', 'busy');
 
-      // Check if scripts are already loaded; if not, inject them
-      let isLoaded = false;
-      try {
-        const check = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => typeof window.rahiScanInteractiveElements === 'function' && typeof window.rahiShowBadges === 'function',
-        });
-        isLoaded = check?.[0]?.result === true;
-      } catch (_) {}
+      let manifest = null;
 
-      if (!isLoaded) {
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['content/scanner.js', 'content/badge_overlay.js', 'content/safety_guard.js', 'content/executor.js'],
-          });
-        } catch (injErr) {
-          console.warn('[Rahi Agent] Injection note:', injErr);
+      // 1. Try primary message passing to content script
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'SCAN_ELEMENTS' });
+        if (response && response.success && Array.isArray(response.manifest)) {
+          manifest = response.manifest;
+          // Trigger badges display
+          await chrome.tabs.sendMessage(tab.id, { action: 'SHOW_BADGES', manifest }).catch(() => {});
         }
+      } catch (_) {
+        // Message passing failed (e.g. script not yet active on tab), proceed to injection fallback
       }
 
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          if (typeof window.rahiScanInteractiveElements === 'function') {
-            const manifest = window.rahiScanInteractiveElements();
-            if (typeof window.rahiShowBadges === 'function') {
-              window.rahiShowBadges(manifest);
-            }
-            return manifest;
-          }
-          return [];
-        },
-      });
+      // 2. Injected script execution fallback
+      if (!manifest) {
+        let isLoaded = false;
+        try {
+          const check = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => typeof window.rahiScanInteractiveElements === 'function' && typeof window.rahiShowBadges === 'function',
+          });
+          isLoaded = check?.[0]?.result === true;
+        } catch (_) {}
 
-      const manifest = results?.[0]?.result || [];
+        if (!isLoaded) {
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ['content/scanner.js', 'content/badge_overlay.js', 'content/safety_guard.js', 'content/executor.js'],
+            });
+          } catch (injErr) {
+            console.warn('[Rahi Agent] Injection note:', injErr);
+          }
+        }
+
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            if (typeof window.rahiScanInteractiveElements === 'function') {
+              const items = window.rahiScanInteractiveElements();
+              if (typeof window.rahiShowBadges === 'function') {
+                window.rahiShowBadges(items);
+              }
+              return items;
+            }
+            return [];
+          },
+        });
+
+        manifest = results?.[0]?.result || [];
+      }
+
       this.currentManifest = manifest;
 
       this.setStatus(`Numbered ${manifest.length} interactive elements on page`, 'online');
@@ -157,18 +205,29 @@ export class AgentApprovalController {
    * Clears badges from active tab
    */
   async clearBadgesOnTab() {
-    const tab = this.getActiveTab();
+    const tab = await this.resolveActiveTab();
     if (!tab || !tab.id) return;
 
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          if (typeof window.rahiRemoveBadges === 'function') {
-            window.rahiRemoveBadges();
-          }
-        },
-      });
+      // 1. Try message passing
+      let cleared = false;
+      try {
+        const res = await chrome.tabs.sendMessage(tab.id, { action: 'CLEAR_BADGES' });
+        if (res && res.success) cleared = true;
+      } catch (_) {}
+
+      // 2. Fallback via executeScript
+      if (!cleared && chrome.scripting?.executeScript) {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            if (typeof window.rahiRemoveBadges === 'function') {
+              window.rahiRemoveBadges();
+            }
+          },
+        }).catch(() => {});
+      }
+
       this.setStatus('Badges cleared from page', 'online');
       this.appendLog('Cleared badges from page', 'info');
     } catch (err) {
@@ -183,11 +242,16 @@ export class AgentApprovalController {
     const query = prompt('What element are you looking for on this page? (e.g. "Apply Now button", "Pricing table", "Search input")');
     if (!query || !query.trim()) return;
 
-    const tab = this.getActiveTab();
+    const tab = await this.resolveActiveTab();
     const settings = this.getSettings();
 
     if (!tab || !tab.id) {
-      alert('No active browser tab found.');
+      alert('No active browser tab found. Please focus a web page first.');
+      return;
+    }
+
+    if (/^(chrome|edge|about|chrome-extension):/i.test(tab.url || '') || tab.url?.includes('chromewebstore.google.com')) {
+      alert('Rahi cannot locate elements on browser internal pages (chrome://, etc.). Please switch to a web page.');
       return;
     }
 
@@ -200,6 +264,7 @@ export class AgentApprovalController {
       this.setStatus(`Locating "${query}"...`, 'busy');
       const result = await findAndHighlightElement({
         tabId: tab.id,
+        tabUrl: tab.url,
         query,
         apiKey: settings.geminiApiKey,
         groqApiKey: settings.groqApiKey,
@@ -226,8 +291,15 @@ export class AgentApprovalController {
     }
 
     // Layer 1 Safety Guard: Domain Firewall Check
-    const activeTab = this.getActiveTab();
+    const activeTab = await this.resolveActiveTab();
     if (activeTab && activeTab.url) {
+      if (/^(chrome|edge|about|chrome-extension):/i.test(activeTab.url) || activeTab.url.includes('chromewebstore.google.com')) {
+        this.setStatus('Task Aborted: Internal Browser Page', 'error');
+        this.appendLog('🛡️ Rahi cannot run tasks on browser internal pages (chrome://, etc.). Please switch to a web page.', 'error');
+        alert('Rahi cannot run tasks on browser internal pages (chrome://, etc.). Please switch to a regular web page.');
+        return;
+      }
+
       const firewall = checkDomainFirewall(activeTab.url);
       if (!firewall.allowed) {
         this.setStatus('Task Aborted: Financial or Authentication Portal', 'error');
@@ -552,6 +624,13 @@ export class AgentApprovalController {
     await this.clearBadgesOnTab();
     this.setStatus(reason, 'warning');
     this.appendLog(`🛑 ${reason}`, 'warning');
+
+    if (this.currentGoal || (this.actionHistory && this.actionHistory.length > 0)) {
+      const record = await this.saveCurrentTaskToHistory('stopped', reason);
+      if (record) {
+        this.appendExportTraceButton(record);
+      }
+    }
   }
 
   /**
@@ -564,6 +643,187 @@ export class AgentApprovalController {
     await this.clearBadgesOnTab();
     this.setStatus('Goal Complete! 🎉', 'online');
     this.appendLog(`🎉 Task Complete: ${message}`, 'success');
+
+    const record = await this.saveCurrentTaskToHistory('completed', message);
+    if (record) {
+      this.appendExportTraceButton(record);
+    }
+  }
+
+  /**
+   * Appends an inline button to download the HTML trace report directly in the log
+   * @param {Object} record
+   */
+  appendExportTraceButton(record) {
+    if (!this.elements.agentLogList || typeof document === 'undefined') return;
+
+    const btnWrapper = document.createElement('div');
+    btnWrapper.style.cssText = 'padding: 4px 0 8px 0; display: flex; gap: 6px;';
+
+    const btnExport = document.createElement('button');
+    btnExport.className = 'btn-export-trace-inline';
+    btnExport.innerHTML = '📄 Export Agent Trace (HTML)';
+    btnExport.addEventListener('click', () => {
+      downloadTraceReport(record, this.getUserProfile ? this.getUserProfile() : null);
+    });
+
+    btnWrapper.appendChild(btnExport);
+
+    if (typeof this.elements.agentLogList.prepend === 'function') {
+      this.elements.agentLogList.prepend(btnWrapper);
+    }
+  }
+
+  /**
+   * Loads task history from chrome.storage.local and updates the UI
+   */
+  async loadAndRenderTaskHistory() {
+    try {
+      if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+      const data = await chrome.storage.local.get('agent_task_history');
+      this.taskHistory = Array.isArray(data.agent_task_history) ? data.agent_task_history : [];
+      this.renderTaskHistory(this.taskHistory);
+    } catch (err) {
+      console.warn('[Rahi Agent] Error loading task history:', err);
+    }
+  }
+
+  /**
+   * Saves the current completed or stopped task to persistent history
+   * @param {string} status 'completed' | 'stopped'
+   * @param {string} finalMessage
+   * @returns {Promise<Object>} The saved task record
+   */
+  async saveCurrentTaskToHistory(status = 'completed', finalMessage = '') {
+    try {
+      const activeTab = await this.resolveActiveTab();
+      const record = {
+        id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        goal: this.currentGoal || 'Untitled Task',
+        status,
+        message: finalMessage,
+        stepsCount: this.currentStep,
+        timestamp: Date.now(),
+        pageUrl: activeTab?.url || '',
+        pageTitle: activeTab?.title || 'Web Page',
+        history: [...this.actionHistory],
+      };
+
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        const data = await chrome.storage.local.get('agent_task_history');
+        const existing = Array.isArray(data.agent_task_history) ? data.agent_task_history : [];
+        const updated = [record, ...existing].slice(0, 20); // Keep last 20 tasks
+        await chrome.storage.local.set({ agent_task_history: updated });
+        this.taskHistory = updated;
+        this.renderTaskHistory(updated);
+      }
+
+      return record;
+    } catch (err) {
+      console.warn('[Rahi Agent] Failed to save task history:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Renders the persistent task history list in the Agent View
+   * @param {Array<Object>} tasks
+   */
+  renderTaskHistory(tasks = []) {
+    if (!this.elements.agentHistoryList) return;
+
+    if (!tasks || tasks.length === 0) {
+      this.elements.agentHistoryList.innerHTML = '<div class="history-item empty">No previous errands recorded.</div>';
+      return;
+    }
+
+    if (typeof document === 'undefined' || !document.createElement) {
+      return;
+    }
+
+    this.elements.agentHistoryList.innerHTML = '';
+
+    tasks.forEach((task) => {
+      const card = document.createElement('div');
+      card.className = 'task-history-card';
+
+      const dateStr = new Date(task.timestamp || Date.now()).toLocaleTimeString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const isDone = task.status === 'completed';
+      const statusClass = isDone ? 'completed' : 'stopped';
+      const statusLabel = isDone ? 'Done' : 'Stopped';
+
+      card.innerHTML = `
+        <div class="task-history-row">
+          <span class="task-history-goal" title="${this.escapeHtml(task.goal)}">${this.escapeHtml(task.goal)}</span>
+          <span class="task-status-badge ${statusClass}">${statusLabel}</span>
+        </div>
+        <div class="task-history-meta">
+          <span>${dateStr} • ${task.stepsCount || (task.history ? task.history.length : 0)} steps</span>
+          <span>${this.escapeHtml(task.pageTitle || 'Web Page')}</span>
+        </div>
+        <div class="task-history-actions">
+          <button class="btn-task-replay" data-id="${task.id}" title="Re-run this task on current page">▶ Replay</button>
+          <button class="btn-task-export" data-id="${task.id}" title="Download interactive HTML trace report">📄 Export HTML</button>
+        </div>
+      `;
+
+      // Wire Replay Button
+      const btnReplay = card.querySelector('.btn-task-replay');
+      if (btnReplay) {
+        btnReplay.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.elements.agentGoalInput) {
+            this.elements.agentGoalInput.value = task.goal;
+          }
+          this.startTask(task.goal);
+        });
+      }
+
+      // Wire Export HTML Button
+      const btnExport = card.querySelector('.btn-task-export');
+      if (btnExport) {
+        btnExport.addEventListener('click', (e) => {
+          e.stopPropagation();
+          downloadTraceReport(task, this.getUserProfile ? this.getUserProfile() : null);
+        });
+      }
+
+      if (typeof this.elements.agentHistoryList.appendChild === 'function') {
+        this.elements.agentHistoryList.appendChild(card);
+      }
+    });
+  }
+
+  /**
+   * Clears all stored task history
+   */
+  async clearTaskHistory() {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        await chrome.storage.local.remove('agent_task_history');
+      }
+      this.taskHistory = [];
+      this.renderTaskHistory([]);
+      this.setStatus('Task history cleared', 'online');
+    } catch (err) {
+      console.warn('[Rahi Agent] Error clearing task history:', err);
+    }
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   /**

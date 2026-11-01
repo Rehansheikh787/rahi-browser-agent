@@ -116,6 +116,8 @@ const elements = {
   btnStopAction: document.getElementById('btnStopAction'),
   agentLogList: document.getElementById('agentLogList'),
   btnClearLog: document.getElementById('btnClearLog'),
+  agentHistoryList: document.getElementById('agentHistoryList'),
+  btnClearHistory: document.getElementById('btnClearHistory'),
 };
 
 /**
@@ -519,23 +521,43 @@ function populateSettingsForm() {
 /**
  * Active Tab Information
  */
-async function refreshActiveTabInfo() {
+async function refreshActiveTabInfo(explicitTabId = null) {
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs && tabs[0]) {
-      state.activeTab = tabs[0];
-      const title = tabs[0].title || 'Untitled Tab';
+    let activeTab = null;
+
+    if (explicitTabId && chrome.tabs?.get) {
+      try {
+        activeTab = await chrome.tabs.get(explicitTabId);
+      } catch (_) {}
+    }
+
+    if (!activeTab && chrome.tabs?.query) {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (tabs && tabs[0]) activeTab = tabs[0];
+      } catch (_) {}
+      if (!activeTab) {
+        try {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tabs && tabs[0]) activeTab = tabs[0];
+        } catch (_) {}
+      }
+    }
+
+    if (activeTab) {
+      state.activeTab = activeTab;
+      const title = activeTab.title || 'Untitled Tab';
       elements.chatPageTitle.textContent = title;
-      elements.chatPageTitle.title = tabs[0].url || title;
+      elements.chatPageTitle.title = activeTab.url || title;
 
       if (chatController) {
-        await chatController.setTab(tabs[0]);
+        await chatController.setTab(activeTab);
       }
 
       // Auto-prefill YouTube URL input if viewing YouTube
-      if (tabs[0].url && elements.youtubeUrlInput && !elements.youtubeUrlInput.value) {
-        if (/youtube\.com|youtu\.be/i.test(tabs[0].url)) {
-          elements.youtubeUrlInput.value = tabs[0].url;
+      if (activeTab.url && elements.youtubeUrlInput && !elements.youtubeUrlInput.value) {
+        if (/youtube\.com|youtu\.be/i.test(activeTab.url)) {
+          elements.youtubeUrlInput.value = activeTab.url;
         }
       }
     } else {
@@ -550,14 +572,14 @@ async function refreshActiveTabInfo() {
 // Sync active tab changes dynamically in Side Panel
 try {
   if (chrome.tabs && chrome.tabs.onActivated) {
-    chrome.tabs.onActivated.addListener(async () => {
-      await refreshActiveTabInfo();
+    chrome.tabs.onActivated.addListener(async (activeInfo) => {
+      await refreshActiveTabInfo(activeInfo?.tabId);
     });
   }
   if (chrome.tabs && chrome.tabs.onUpdated) {
     chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
       if (changeInfo.status === 'complete' && state.activeTab && state.activeTab.id === tabId) {
-        await refreshActiveTabInfo();
+        await refreshActiveTabInfo(tabId);
       }
     });
   }

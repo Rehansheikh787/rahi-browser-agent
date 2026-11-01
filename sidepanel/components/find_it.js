@@ -57,6 +57,7 @@ export async function findAndHighlightElement({
   tabId,
   query,
   apiKey,
+  tabUrl = null,
   groqApiKey = null,
   model = 'gemini-3.5-flash-lite',
   language = 'en',
@@ -64,54 +65,63 @@ export async function findAndHighlightElement({
   if (!tabId) {
     throw new Error('No active browser tab specified');
   }
+  if (tabUrl && (/^(chrome|edge|about|chrome-extension):/i.test(tabUrl) || tabUrl.includes('chromewebstore.google.com'))) {
+    throw new Error('Rahi cannot operate on browser internal pages (chrome://, etc.). Please switch to a web page.');
+  }
   if (!query || !query.trim()) {
     throw new Error('Please enter an element or button name to find');
   }
 
-  // 1. Ensure scripts are injected and scan interactive elements
-  let isLoaded = false;
+  // 1. Scan interactive elements (Message passing first, executeScript fallback)
+  let manifest = null;
+
   try {
-    const check = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => typeof window.rahiScanInteractiveElements === 'function' && typeof window.rahiShowBadges === 'function',
-    });
-    isLoaded = check?.[0]?.result === true;
+    const res = await chrome.tabs.sendMessage(tabId, { action: 'SCAN_ELEMENTS' });
+    if (res && res.success && Array.isArray(res.manifest) && res.manifest.length > 0) {
+      manifest = res.manifest;
+      await chrome.tabs.sendMessage(tabId, { action: 'SHOW_BADGES', manifest }).catch(() => {});
+    }
   } catch (_) {}
 
-  if (!isLoaded) {
+  if (!manifest) {
+    let isLoaded = false;
     try {
-      await chrome.scripting.executeScript({
+      const check = await chrome.scripting.executeScript({
         target: { tabId },
-        files: ['content/scanner.js', 'content/badge_overlay.js', 'content/safety_guard.js', 'content/executor.js'],
+        func: () => typeof window.rahiScanInteractiveElements === 'function' && typeof window.rahiShowBadges === 'function',
       });
+      isLoaded = check?.[0]?.result === true;
     } catch (_) {}
+
+    if (!isLoaded) {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['content/scanner.js', 'content/badge_overlay.js', 'content/safety_guard.js', 'content/executor.js'],
+        });
+      } catch (_) {}
+    }
+
+    const scanResults = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        if (typeof window.rahiScanInteractiveElements === 'function') {
+          const items = window.rahiScanInteractiveElements();
+          if (typeof window.rahiShowBadges === 'function') {
+            window.rahiShowBadges(items);
+          }
+          return items;
+        }
+        return [];
+      },
+    });
+
+    manifest = scanResults?.[0]?.result || [];
   }
 
-  const scanResults = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: () => {
-      if (typeof window.rahiScanInteractiveElements === 'function') {
-        return window.rahiScanInteractiveElements();
-      }
-      return [];
-    },
-  });
-
-  const manifest = scanResults?.[0]?.result || [];
   if (!manifest || manifest.length === 0) {
     throw new Error('No visible interactive elements (buttons, links, inputs) were detected on this page.');
   }
-
-  // 2. Ensure numbered badges are displayed on page
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: (items) => {
-      if (typeof window.rahiShowBadges === 'function') {
-        window.rahiShowBadges(items);
-      }
-    },
-    args: [manifest],
-  });
 
   // 3. Build prompt and query AI Gateway
   const { prompt, systemInstruction } = buildElementLocatorPrompt(query, manifest, language);

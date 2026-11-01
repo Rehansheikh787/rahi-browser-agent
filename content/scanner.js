@@ -144,9 +144,10 @@ function classifyElementType(el) {
 function isElementVisible(el) {
   if (!el || !el.getBoundingClientRect) return false;
 
-  // Check dimensions
+  // Check dimensions & client rects
   const rect = el.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return false;
+  const hasDimensions = (rect.width > 0 && rect.height > 0) || (typeof el.getClientRects === 'function' && el.getClientRects().length > 0);
+  if (!hasDimensions) return false;
 
   // Check computed styles
   if (typeof window !== 'undefined' && window.getComputedStyle) {
@@ -155,7 +156,6 @@ function isElementVisible(el) {
       if (style.display === 'none') return false;
       if (style.visibility === 'hidden') return false;
       if (style.opacity === '0') return false;
-      if (style.pointerEvents === 'none') return false;
     } catch (_) {}
   }
 
@@ -179,44 +179,46 @@ function scanInteractiveElements(root = typeof document !== 'undefined' ? docume
   let nextId = 1;
 
   for (const el of rawElements) {
-    // Avoid scanning Rahi's own UI elements if accidentally matched
-    if (el.closest?.('#rahi-badge-root') || el.id?.startsWith('rahi-')) {
-      continue;
-    }
+    try {
+      // Avoid scanning Rahi's own UI elements if accidentally matched
+      if (el.closest?.('#rahi-badge-root') || el.id?.startsWith('rahi-')) {
+        continue;
+      }
 
-    if (!isElementVisible(el)) {
-      continue;
-    }
+      if (!isElementVisible(el)) {
+        continue;
+      }
 
-    const rect = el.getBoundingClientRect();
-    const type = classifyElementType(el);
-    const label = computeElementLabel(el);
+      const rect = el.getBoundingClientRect();
+      const type = classifyElementType(el);
+      const label = computeElementLabel(el);
 
-    // Grab current value if input/select/textarea
-    let value = undefined;
-    if (type === 'checkbox' || type === 'radio') {
-      value = el.checked ? 'true' : 'false';
-    } else if (el.value !== undefined && el.value !== '') {
-      value = String(el.value).substring(0, 50);
-    }
+      // Grab current value if input/select/textarea
+      let value = undefined;
+      if (type === 'checkbox' || type === 'radio') {
+        value = el.checked ? 'true' : 'false';
+      } else if (el.value !== undefined && el.value !== '') {
+        value = String(el.value).substring(0, 50);
+      }
 
-    const item = {
-      id: nextId,
-      type,
-      label,
-      placeholder: el.placeholder || undefined,
-      value,
-      rect: {
-        top: Math.round(rect.top),
-        left: Math.round(rect.left),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-      },
-    };
+      const item = {
+        id: nextId,
+        type,
+        label,
+        placeholder: el.placeholder || undefined,
+        value,
+        rect: {
+          top: Math.round(rect.top),
+          left: Math.round(rect.left),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        },
+      };
 
-    validElements.push(el);
-    compactManifest.push(item);
-    nextId++;
+      validElements.push(el);
+      compactManifest.push(item);
+      nextId++;
+    } catch (_) {}
   }
 
   // Cache in-memory references for direct action execution

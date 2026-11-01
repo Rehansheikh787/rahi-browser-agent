@@ -91,6 +91,7 @@ When a user initiates an autonomous goal (e.g., *"Find and apply to this job"*, 
 
 ### Pillar 2: The Brain (Grounded Chat & Multimodal Reasoning)
 - **Zero Hallucinations:** Enforces strict context boundaries—if a requested fact is not present in the active DOM or extracted article, Rahi explicitly states: *"I cannot find that information on the current page."*
+- **Real-Time Token Streaming:** Progressive Server-Sent Events (SSE) token streaming via Gemini and Groq with live cursor animation and instant provider-switch pills.
 - **Sliding Window History:** Caps conversational history to the last 20 messages, preserving tokens and preventing compaction degradation.
 - **Bilingual Hinglish Toggle:** Switch on-the-fly between standard English and conversational Romanized Hinglish.
 
@@ -101,8 +102,10 @@ When a user initiates an autonomous goal (e.g., *"Find and apply to this job"*, 
 ---
 
 ### Pillar 3: The Hands (Action Agent with Human Approval)
-- **Isolated Shadow DOM Badges:** Visual badges (`#1`, `#2`, `#3`...) numbered sequentially and overlaid over all actionable elements.
+- **Isolated Shadow DOM Badges:** Visual badges (`#1`, `#2`, `#3`...) numbered sequentially and overlaid over all actionable elements across standard web pages and dynamic single-page applications.
 - **"Find It for Me" Pulse Locator:** Type what you're looking for (e.g. *"Pricing button"*, *"Career links"*); Rahi scrolls to the element and triggers a high-visibility pulsing golden ring.
+- **Agent Task History & One-Click Replay:** Automatically records every completed or stopped errand into `chrome.storage.local`, displaying recent tasks with step counts, outcomes, timestamps, and a one-click **Replay** trigger to execute recurring workflows.
+- **Export Agent Trace (Shareable HTML Report):** Generates self-contained, beautifully styled, dark-mode HTML reports of completed agent errands—complete with chronological step cards, target elements, agent chain-of-thought reasoning, parameters, and outcomes—perfect for portfolio sharing, audits, and debugging.
 - **React Controlled Component Setter Hack:** Directly invokes native property setters:
   ```javascript
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -112,7 +115,7 @@ When a user initiates an autonomous goal (e.g., *"Find and apply to this job"*, 
   ```
 
 <div align="center">
-  <img src="docs/screenshots/form_autofill_badges.png" width="60%" alt="Rahi Badges Overlaid on Form" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-right: 12px;" />
+  <img src="docs/screenshots/wikipedia_numbered_badges.png" width="60%" alt="Rahi Numbered Badges Overlaid on Wikipedia" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-right: 12px;" />
   <img src="docs/screenshots/sidepanel_agent_tab.png" width="30%" alt="Rahi Agent Approval Card" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);" />
 </div>
 
