@@ -48,12 +48,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       currentSettings.enableDryRunDefault = false;
       settingsChanged = true;
     }
-    // Pre-seed developer keys if not yet entered
-    if (!currentSettings.geminiApiKey) {
+    // Ensure default settings exist
+    if (typeof currentSettings.geminiApiKey !== 'string') {
       currentSettings.geminiApiKey = '';
       settingsChanged = true;
     }
-    if (!currentSettings.groqApiKey) {
+    if (typeof currentSettings.groqApiKey !== 'string') {
       currentSettings.groqApiKey = '';
       settingsChanged = true;
     }
