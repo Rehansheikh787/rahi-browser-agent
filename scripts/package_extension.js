@@ -100,3 +100,4 @@ if (fs.existsSync(zipOutputPath)) {
   console.error('❌ Packaging failed: Output zip was not created.');
   process.exit(1);
 }
+

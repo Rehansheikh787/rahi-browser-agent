@@ -29,6 +29,8 @@ const server = http.createServer((req, res) => {
   // Route shortcuts
   if (reqPath === '/' || reqPath === '/landing') {
     reqPath = '/landing/index.html';
+  } else if (reqPath === '/style.css') {
+    reqPath = '/landing/style.css';
   } else if (reqPath === '/form' || reqPath === '/mock_internship_form.html') {
     reqPath = '/test/fixtures/mock_internship_form.html';
   } else if (reqPath === '/catalog' || reqPath === '/mock_product_catalog.html') {
@@ -72,3 +74,4 @@ server.listen(PORT, () => {
   console.log(`📰 Article Mock Layout:    http://localhost:${PORT}/article`);
   console.log('\nPress Ctrl + C to stop server.');
 });
+
